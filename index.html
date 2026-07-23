@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EBV Imóveis | Alto Padrão & Atendimento Humanizado em Curitiba</title>
+  <meta name="description" content="Encontre imóveis de alto padrão em Curitiba com o atendimento humanizado, dedicação e 25 anos de experiência de Edicleia Borba Vieira.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-src 'self' https://maps.google.com https://www.google.com;">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Header & Navigation -->
+  <header id="header">
+    <div class="nav-container">
+      <div class="brand" onclick="navigateTo('home')">
+        <!-- Logo Oficial: Chave com Asas de Borboleta -->
+        <img src="assets/logo_icon.png" alt="EBV Imóveis" class="brand-logo-img">
+        <div class="brand-text">
+          <span class="brand-title">EBV Imóveis</span>
+          <span class="brand-subtitle">Curitiba</span>
+        </div>
+      </div>
+      
+      <button class="mobile-toggle" aria-label="Toggle Menu" onclick="toggleMobileMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
+      <nav>
+        <ul id="nav-menu">
+          <li><a href="#home" class="nav-link active" onclick="navigateTo('home')">Início</a></li>
+          <li><a href="#imoveis" class="nav-link" onclick="navigateTo('imoveis')">Imóveis</a></li>
+          <li><a href="#avaliacao" class="nav-link" onclick="navigateTo('avaliacao')">Avaliação</a></li>
+          <li><a href="#sobre" class="nav-link" onclick="navigateTo('sobre')">Sobre a Corretora</a></li>
+          <li><a href="#admin" class="nav-btn-admin" onclick="navigateTo('admin')">Painel EBV</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content Route Wrapper -->
+  <main>
+
+    <!-- PAGE: HOME -->
+    <div id="page-home" class="page active">
+      <!-- Hero Banner -->
+      <section class="hero" id="hero-section">
+        <div class="hero-content">
+          <span class="hero-tagline">Mais que transações, histórias de vida</span>
+          <h1>EBV Imóveis Curitiba</h1>
+          <p class="hero-sub">Imóveis selecionados com o atendimento humanizado, dedicação e 25 anos de experiência de Edicleia Borba Vieira.</p>
+        </div>
+        
+        <!-- Quick Search Bar -->
+        <div class="search-container">
+          <div class="search-tabs" style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
+            <span style="font-family: var(--font-sub); font-size: 0.85rem; font-weight: 700; color: var(--primary-color); text-transform: uppercase; letter-spacing: 1px;">Buscar Imóveis para Venda</span>
+          </div>
+          <div class="search-fields">
+            <div class="search-field">
+              <label for="search-type">Tipo de Imóvel</label>
+              <select id="search-type">
+                <option value="todos">Todos os Tipos</option>
+              </select>
+            </div>
+            <div class="search-field">
+              <label for="search-location">Bairro / Região</label>
+              <select id="search-location">
+                <option value="todos">Todos os Bairros</option>
+              </select>
+            </div>
+            <div class="search-field">
+              <label for="search-price">Preço Máximo</label>
+              <select id="search-price">
+                <option value="todos">Qualquer Valor</option>
+                <option value="500000">Até R$ 500.000</option>
+                <option value="1000000">Até R$ 1.000.000</option>
+                <option value="2000000">Até R$ 2.000.000</option>
+                <option value="5000000">Até R$ 5.000.000</option>
+              </select>
+            </div>
+            <button class="search-submit-btn" onclick="executeQuickSearch()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              Buscar
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Services Intro -->
+      <section id="services-intro">
+        <div class="section-header">
+          <span class="section-tagline">Nossos Serviços</span>
+          <h2>Como posso lhe ajudar?</h2>
+        </div>
+        <div class="services-grid">
+          <div class="service-card">
+            <div class="service-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            </div>
+            <h3>Venda de Imóveis</h3>
+            <p>Divulgação profissional, seleção de clientes qualificados e condução ética de todo o processo de negociação.</p>
+            <button class="btn-secondary" onclick="navigateTo('imoveis')">Ver Catálogo</button>
+          </div>
+          <div class="service-card">
+            <div class="service-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            </div>
+            <h3>Avaliação de Preço</h3>
+            <p>Estudo comparativo de mercado completo e preciso para definir o valor real de mercado do seu imóvel.</p>
+            <button class="btn-secondary" onclick="navigateTo('avaliacao')">Avaliar Meu Imóvel</button>
+          </div>
+          <div class="service-card" style="border-color: var(--primary-color); box-shadow: 0 4px 20px rgba(114, 47, 55, 0.08);">
+            <div class="service-icon" style="color: var(--primary-color);">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            </div>
+            <h3>Quer Vender seu Imóvel?</h3>
+            <p>Anuncie conosco e tenha seu imóvel divulgado com atendimento qualificado e a experiência de mais de 25 anos.</p>
+            <a href="https://wa.me/5541988024346?text=Ol%C3%A1%20Edicleia!%20Gostaria%20de%20conversar%20sobre%20a%20venda%20do%20meu%20im%C3%B3vel." target="_blank" class="btn-secondary" style="border-color: var(--primary-color); color: var(--primary-color); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; height: 42px;">Chamar no WhatsApp</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Featured Properties -->
+      <div class="section-bg">
+        <section id="featured-properties">
+          <div class="section-header">
+            <span class="section-tagline">Destaques Selecionados</span>
+            <h2>Imóveis em Destaque</h2>
+          </div>
+          
+          <div class="listings-grid" id="featured-grid">
+            <!-- Populated via JavaScript -->
+          </div>
+          
+          <div style="text-align: center; margin-top: 50px;">
+            <button class="btn-primary" onclick="navigateTo('imoveis')">Ver Todos os Imóveis</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- Humanized Hook -->
+      <section id="human-cta">
+        <div class="about-container">
+          <div class="about-photo-wrapper">
+            <img src="assets/edicleia_profile.jpg" alt="Edicleia Borba Vieira" class="about-photo">
+          </div>
+          <div class="about-details">
+            <span class="section-tagline">Trabalho, Dedicação & Confiança</span>
+            <h3>Uma parceria para a vida toda</h3>
+            <p style="margin: 20px 0; font-size: 1.1rem; color: var(--text-dark);">
+              "Compreendo que comprar ou vender um imóvel não é apenas assinar um contrato, é uma transição de vida. Com minha formação em Recursos Humanos e 25 anos de experiência prática, coloco as pessoas em primeiro lugar para garantir negociações seguras, transparentes e felizes."
+            </p>
+            <span style="font-family: var(--font-title); font-size: 1.3rem; font-weight: 600; color: var(--primary-color);">Edicleia Borba Vieira</span>
+            <p style="font-size: 0.85rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 1px;">Fundadora da EBV Imóveis</p>
+            <div style="margin-top: 30px;">
+              <button class="btn-primary" onclick="navigateTo('sobre')">Saiba Mais Sobre Minha Trajetória</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- PAGE: IMOVEIS -->
+    <div id="page-imoveis" class="page">
+      <section>
+        <div class="section-header">
+          <span class="section-tagline">Nosso Portfólio</span>
+          <h2>Imóveis Disponíveis</h2>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="listings-filter-bar" style="justify-content: flex-end;">
+          <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+            <div class="search-field" style="flex-direction: row; align-items: center; gap: 8px;">
+              <input type="text" id="catalog-keyword" placeholder="Bairro, Tipo ou palavra-chave..." oninput="triggerFilters()" style="padding: 8px 15px; width: 220px; font-size: 0.85rem;">
+            </div>
+            
+            <div class="listings-sort">
+              <select id="catalog-sort" onchange="triggerFilters()">
+                <option value="default">Ordenar por</option>
+                <option value="price-asc">Menor Preço</option>
+                <option value="price-desc">Maior Preço</option>
+                <option value="area-desc">Maior Área</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Catalog Grid -->
+        <div class="listings-grid" id="catalog-grid">
+          <!-- Populated via JavaScript -->
+        </div>
+      </section>
+
+      <!-- Owner Call to Action Section -->
+      <section class="owner-cta-section" style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%); color: var(--bg-clean); padding: 50px 40px; border-radius: 20px; text-align: center; margin: 40px auto 20px; max-width: 1100px; box-shadow: var(--shadow-medium);">
+        <span style="font-family: var(--font-sub); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.8); display: block; margin-bottom: 15px;">Quer Vender Seu Imóvel?</span>
+        <h2 style="font-family: var(--font-title); font-size: 2rem; color: var(--bg-clean); margin-bottom: 20px; font-weight: 400; line-height: 1.3;">Gostaria que a Edicleia vendesse seu imóvel?</h2>
+        <p style="font-size: 1rem; line-height: 1.6; color: rgba(255,255,255,0.9); max-width: 700px; margin: 0 auto 30px;">
+          Deixe seu patrimônio nas mãos de quem tem mais de 25 anos de experiência, dedicação fiel e acompanhamento humanizado em Curitiba. Entre em contato agora pelo WhatsApp e vamos marcar uma conversa!
+        </p>
+        <a href="https://wa.me/5541988024346?text=Ol%C3%A1%20Edicleia!%20Gostaria%20de%20conversar%20sobre%20a%20venda%20do%20meu%20im%C3%B3vel." target="_blank" class="btn-primary" style="background-color: #25D366; color: #fff; border: none; display: inline-flex; margin: 0 auto; padding: 12px 30px; border-radius: 30px; box-shadow: 0 4px 20px rgba(37, 211, 102, 0.4); text-decoration: none; font-weight: 600; align-items: center; gap: 8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+          Chamar no WhatsApp e Agendar Conversa
+        </a>
+      </section>
+    </div>
+
+    <!-- PAGE: AVALIACAO -->
+    <div id="page-avaliacao" class="page">
+      <section>
+        <div class="appraisal-section">
+          <div class="appraisal-info">
+            <span class="section-tagline">Avaliação de Mercado</span>
+            <h3>Quer vender seu imóvel? Eu faço a avaliação</h3>
+            <p>Uma avaliação precisa é o primeiro passo para o sucesso da transação. Analisamos a localização, o estado de conservação, as tendências de mercado de Curitiba e os imóveis comparáveis da região.</p>
+            
+            <ul class="appraisal-steps">
+              <li>
+                <div class="step-num">1</div>
+                <h4>Preenchimento</h4>
+                <p>Insira as principais características do imóvel no formulário ao lado.</p>
+              </li>
+              <li>
+                <div class="step-num">2</div>
+                <h4>Análise Comparativa</h4>
+                <p>Edicleia fará um estudo comparativo detalhado da sua região.</p>
+              </li>
+              <li>
+                <div class="step-num">3</div>
+                <h4>Entrega e Proposta</h4>
+                <p>Apresentamos o laudo de avaliação e traçamos a melhor estratégia de venda.</p>
+              </li>
+            </ul>
+          </div>
+          
+          <!-- Appraisal Form -->
+          <div class="form-card">
+            <div class="success-alert" id="appraisal-success">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <div>
+                <strong>Solicitação enviada com sucesso!</strong><br>
+                Edicleia entrará em contato em breve para apresentar a avaliação.
+              </div>
+            </div>
+            
+            <form id="appraisal-form" onsubmit="submitAppraisal(event)">
+              <div class="form-grid">
+                <div class="form-group form-full">
+                  <label for="ap-name">Seu Nome Completo *</label>
+                  <input type="text" id="ap-name" required placeholder="Ex: Maria da Silva">
+                </div>
+                <div class="form-group">
+                  <label for="ap-phone">Telefone / WhatsApp *</label>
+                  <input type="tel" id="ap-phone" required placeholder="Ex: (41) 99999-9999">
+                </div>
+                <div class="form-group">
+                  <label for="ap-email">E-mail *</label>
+                  <input type="email" id="ap-email" required placeholder="Ex: maria@exemplo.com">
+                </div>
+                <div class="form-group">
+                  <label for="ap-type">Tipo de Imóvel *</label>
+                  <select id="ap-type" required>
+                    <option value="" disabled selected>Selecione o tipo</option>
+                    <option value="Apartamento">Apartamento</option>
+                    <option value="Casa">Casa</option>
+                    <option value="Sobrado">Sobrado</option>
+                    <option value="Terreno">Terreno</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="ap-area">Área Privativa (m²)</label>
+                  <input type="number" id="ap-area" placeholder="Ex: 120">
+                </div>
+                <div class="form-group form-full">
+                  <label for="ap-location">Localização / Bairro *</label>
+                  <input type="text" id="ap-location" required placeholder="Ex: Batel, Curitiba">
+                </div>
+                <div class="form-group form-full">
+                  <label for="ap-details">Detalhes adicionais (Quartos, vagas, diferenciais...)</label>
+                  <textarea id="ap-details" placeholder="Ex: 3 quartos sendo 1 suíte, 2 vagas, reformado recentemente."></textarea>
+                </div>
+              </div>
+              <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Solicitar Avaliação Gratuita</button>
+            </form>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- PAGE: SOBRE -->
+    <div id="page-sobre" class="page">
+      <section>
+        <div class="about-container">
+          <div class="about-photo-wrapper">
+            <img src="assets/edicleia_profile.jpg" alt="Edicleia Borba Vieira - Corretora" class="about-photo">
+          </div>
+          <div class="about-details">
+            <span class="section-tagline">Sobre a Corretora</span>
+            <h3>Edicleia Borba Vieira</h3>
+            <p class="about-subtitle">CRECI-PR 14269 • 25+ Anos de Experiência</p>
+            
+            <div class="about-description">
+              <p>Minha trajetória é movida pela paixão em conectar pessoas aos seus lares ideais. Ao longo de mais de duas décadas, atuei ativamente no mercado de Curitiba, liderando e gerenciando equipes em grandes imobiliárias da capital. Essa bagagem me deu a visão estratégica de mercado necessária para realizar transações seguras, do início ao fim.</p>
+              
+              <p>Minha formação em **Recursos Humanos** moldou minha filosofia de trabalho: acredito que negócios imobiliários são feitos de pessoas para pessoas. Por isso, prezo pelo atendimento consultivo, transparente e extremamente humanizado. Meu compromisso é ser fiel aos interesses do meu cliente, oferecendo transparência, acompanhamento contínuo e dedicação absoluta.</p>
+            </div>
+
+            <div class="about-highlights">
+              <div class="highlight-item">
+                <div class="highlight-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </div>
+                <div>
+                  <h4>25+ Anos de Mercado</h4>
+                  <p>Experiência prática em Curitiba, com amplo repertório de negociações.</p>
+                </div>
+              </div>
+              <div class="highlight-item">
+                <div class="highlight-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </div>
+                <div>
+                  <h4>Formação em RH</h4>
+                  <p>Habilidade interpessoal diferenciada para entender suas demandas de moradia.</p>
+                </div>
+              </div>
+              <div class="highlight-item">
+                <div class="highlight-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </div>
+                <div>
+                  <h4>Ex-Gerente Imobiliária</h4>
+                  <p>Conhecimento profundo das regras administrativas, cartoriais e de financiamento.</p>
+                </div>
+              </div>
+              <div class="highlight-item">
+                <div class="highlight-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </div>
+                <div>
+                  <h4>Fidelidade & Ética</h4>
+                  <p>Transparência total e defesa dos melhores interesses de compradores e vendedores.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Brand Pattern Segment -->
+      <div class="brand-pattern-banner">
+        <div class="brand-pattern-content">
+          <h3>"A chave para realizar seu sonho, com asas para voar alto e a segurança de quem tem experiência."</h3>
+          <p>EBV Imóveis — Padrão de Atendimento Edicleia Borba Vieira</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: TERMOS -->
+    <div id="page-termos" class="page">
+      <section style="max-width: 800px; margin: 0 auto; padding: 40px 20px;">
+        <span class="section-tagline">EBV Imóveis</span>
+        <h2 style="font-family: var(--font-title); font-size: 2.2rem; color: var(--primary-color); margin-bottom: 25px;">Termos de Uso</h2>
+        <div style="line-height: 1.8; color: var(--text-dark); font-size: 0.95rem;">
+          <p>Seja bem-vindo ao site da EBV Imóveis. Ao navegar ou interagir com nosso site, você concorda em cumprir e se submeter aos seguintes termos e condições de uso.</p>
+          
+          <h3 style="color: var(--primary-color); margin-top: 30px; margin-bottom: 10px; font-family: var(--font-title);">1. Propriedade Intelectual</h3>
+          <p>Todo o conteúdo publicado neste site, incluindo logotipos, textos, imagens reais de imóveis, fotografias e designs (como o logotipo da chave com asas de borboleta) são de propriedade exclusiva da EBV Imóveis ou de seus respectivos proprietários, sendo protegidos pelas leis brasileiras de direitos autorais e propriedade intelectual.</p>
+
+          <h3 style="color: var(--primary-color); margin-top: 30px; margin-bottom: 10px; font-family: var(--font-title);">2. Precisão das Informações</h3>
+          <p>Os imóveis descritos no catálogo contêm informações fornecidas diretamente pela corretora Edicleia Borba Vieira. Embora façamos o máximo esforço para manter todas as informações atualizadas, os valores de venda, especificações e disponibilidade física dos imóveis estão sujeitos a alterações sem aviso prévio.</p>
+
+          <h3 style="color: var(--primary-color); margin-top: 30px; margin-bottom: 10px; font-family: var(--font-title);">3. Responsabilidade do Usuário</h3>
+          <p>O usuário concorda em utilizar este site de maneira lícita e ética. Ao preencher qualquer formulário (como o formulário de Avaliação de Imóvel), você se compromete a fornecer dados corretos e verídicos de contato (nome, telefone e e-mail), abstendo-se de usar informações falsas ou de terceiros sem autorização prévia.</p>
+
+          <h3 style="color: var(--primary-color); margin-top: 30px; margin-bottom: 10px; font-family: var(--font-title);">4. Jurisdição</h3>
+          <p>Estes termos são regidos pelas leis da República Federativa do Brasil. Quaisquer disputas relacionadas ao uso deste site serão de jurisdição exclusiva do Foro da Comarca de Curitiba, Paraná.</p>
+
+          <p style="margin-top: 40px; font-size: 0.85rem; color: var(--text-light);">Última atualização: 20 de Julho de 2026.</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- PAGE: PRIVACIDADE -->
+    <div id="page-privacidade" class="page">
+      <section style="max-width: 800px; margin: 0 auto; padding: 40px 20px;">
+        <span class="section-tagline">EBV Imóveis</span>
+        <h2 style="font-family: var(--font-title); font-size: 2.2rem; color: var(--primary-color); margin-bottom: 25px;">Política de Privacidade e LGPD</h2>
+        <div style="line-height: 1.8; color: var(--text-dark); font-size: 0.95rem;">
+          <p>A EBV Imóveis, sob responsabilidade de Edicleia Borba Vieira, está comprometida com a proteção de seus dados pessoais. Esta Política explica como coletamos, tratamos e protegemos seus dados em total conformidade com a <strong>Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018)</strong>.</p>
+          
+          <h3 style="color: var(--primary-color); margin-top: 30px; margin-bottom: 10px; font-family: var(--font-title);">1. Quais dados coletamos?</h3>
+          <p>Coletamos informações que você fornece ativamente no site:</p>
+          <ul style="margin-left: 20px; margin-bottom: 15px; list-style-type: disc;">
+            <li><strong>Formulário de Avaliação</strong>: Nome, e-mail, telefone (WhatsApp), tipo de imóvel, metragem e localização do bem a ser avaliado.</li>
+            <li><strong>Contato via WhatsApp</strong>: Quando você clica em "Ver Detalhes" e opta por entrar em contato, o site envia uma mensagem padronizada contendo a referência do imóvel para o celular da corretora. O processamento da conversa se dá fora do site, diretamente pelo aplicativo de mensagens.</li>
+          </ul>
+
+          <h3 style="color: var(--primary-color); margin-top: 30px; margin-bottom: 10px; font-family: var(--font-title);">2. Para que fins coletamos seus dados?</h3>
+          <p>O tratamento de seus dados é realizado estritamente para:</p>
+          <ul style="margin-left: 20px; margin-bottom: 15px; list-style-type: disc;">
+            <li>Realizar estudos comparativos de mercado e entregar o laudo de avaliação do imóvel solicitado por você.</li>
+            <li>Retornar contatos comerciais, agendar visitas e responder a dúvidas sobre os imóveis à venda.</li>
+            <li>Cumprir obrigações legais de registro profissional no CRECI-PR.</li>
+          </ul>
+
+          <h3 style="color: var(--primary-color); margin-top: 30px; margin-bottom: 10px; font-family: var(--font-title);">3. Compartilhamento e Armazenamento</h3>
+          <p>Seus dados são armazenados localmente e de forma restrita e segura, sob supervisão direta de Edicleia Borba Vieira. <strong>Nós nunca compartilhamos, vendemos ou divulgamos seus dados pessoais</strong> para terceiros, imobiliárias parceiras ou empresas de marketing.</p>
+
+          <h3 style="color: var(--primary-color); margin-top: 30px; margin-bottom: 10px; font-family: var(--font-title);">4. Seus Direitos (Artigo 18 da LGPD)</h3>
+          <p>Como titular dos dados, você pode solicitar a qualquer momento à EBV Imóveis:</p>
+          <ul style="margin-left: 20px; margin-bottom: 15px; list-style-type: disc;">
+            <li>A confirmação da existência de tratamento de dados.</li>
+            <li>O acesso completo aos seus dados armazenados.</li>
+            <li>A correção de dados incompletos, inexatos ou desatualizados.</li>
+            <li>A eliminação definitiva de seus dados pessoais do nosso cadastro.</li>
+          </ul>
+          <p>Para exercer qualquer um desses direitos, entre em contato direto pelo e-mail <strong>contato@ebvimoveiscuritiba.com.br</strong> ou pelo WhatsApp <strong>(41) 98802-4346</strong>.</p>
+
+          <p style="margin-top: 40px; font-size: 0.85rem; color: var(--text-light);">Última atualização: 20 de Julho de 2026.</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- PAGE: ADMIN DASHBOARD -->
+    <div id="page-admin" class="page">
+      <section class="admin-section">
+        <div class="admin-header">
+          <div>
+            <span class="section-tagline">Área Restrita</span>
+            <h2>Painel da Edicleia</h2>
+          </div>
+          
+          <div class="admin-tabs" style="display: flex; align-items: center; gap: 15px;">
+            <button class="admin-tab-btn active" onclick="switchAdminTab('props', this)">Meus Imóveis</button>
+            <button class="admin-tab-btn" onclick="switchAdminTab('requests', this)">Avaliações Solicitadas (<span id="req-count">0</span>)</button>
+            <button class="btn-secondary" onclick="handleLogout()" style="padding: 6px 15px; font-size: 0.8rem; border-radius: 20px; border-color: #c0392b; color: #c0392b; background: transparent; height: 35px; box-shadow: none;">Sair</button>
+          </div>
+        </div>
+
+        <!-- STATS CARD ROW -->
+        <div class="admin-stats-grid">
+          <div class="stat-card">
+            <h4>Total de Imóveis</h4>
+            <p id="stat-total-props">0</p>
+          </div>
+          <div class="stat-card">
+            <h4>Pedidos de Avaliação</h4>
+            <p id="stat-total-evals">0</p>
+          </div>
+        </div>
+
+        <!-- ADMIN TAB: PROPERTIES -->
+        <div id="admin-tab-props" class="admin-container active">
+          <!-- REGISTER NEW PROPERTY -->
+          <div class="form-card" style="margin-bottom: 40px;">
+            <h3 id="admin-form-title" style="font-family: var(--font-title); font-size: 1.6rem; color: var(--primary-color); margin-bottom: 25px;">Cadastrar Novo Imóvel</h3>
+            
+            <form id="new-property-form" onsubmit="saveNewProperty(event)">
+              <div class="form-grid">
+                <div class="form-group form-full">
+                  <label for="prop-title">Título do Imóvel *</label>
+                  <input type="text" id="prop-title" required placeholder="Ex: Sobrado Moderno em Condomínio Fechado - 3 Suítes">
+                </div>
+                <div class="form-group">
+                  <label for="prop-type">Tipo de Imóvel *</label>
+                  <select id="prop-type" required>
+                    <option value="apartamento">Apartamento</option>
+                    <option value="casa">Casa</option>
+                    <option value="sobrado">Sobrado</option>
+                    <option value="cobertura">Cobertura</option>
+                    <option value="terreno">Terreno</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="prop-price">Preço (R$) *</label>
+                  <input type="number" id="prop-price" required placeholder="Ex: 850000">
+                </div>
+                <div class="form-group">
+                  <label for="prop-location">Bairro / Região *</label>
+                  <input type="text" id="prop-location" required placeholder="Ex: Batel">
+                </div>
+                <div class="form-group">
+                  <label for="prop-address">Endereço Completo (para o Google Maps) *</label>
+                  <input type="text" id="prop-address" required placeholder="Ex: R. Sinke Ferreira, 1050, sobrado 2">
+                </div>
+                <div class="form-group">
+                  <label for="prop-area">Área Útil (m²) *</label>
+                  <input type="number" id="prop-area" required placeholder="Ex: 150">
+                </div>
+                <div class="form-group">
+                  <label for="prop-beds">Quartos *</label>
+                  <input type="number" id="prop-beds" required placeholder="Ex: 3">
+                </div>
+                <div class="form-group">
+                  <label for="prop-baths">Banheiros *</label>
+                  <input type="number" id="prop-baths" required placeholder="Ex: 2">
+                </div>
+                <div class="form-group">
+                  <label for="prop-vagas">Vagas de Garagem</label>
+                  <input type="number" id="prop-vagas" placeholder="Ex: 2">
+                </div>
+                <div class="form-group" style="grid-column: span 2;">
+                  <label for="prop-files">Adicionar Fotos do Imóvel <span id="prop-files-star">*</span> (Selecione uma ou mais fotos do seu computador)</label>
+                  <input type="file" id="prop-files" multiple accept="image/*" required style="background: var(--bg-section); padding: 10px; border: 1px dashed var(--border-color); border-radius: 8px; width: 100%; cursor: pointer;">
+                  <small id="prop-files-help" style="display: none; color: var(--text-light); font-size: 0.8rem; margin-top: 5px;">Caso não selecione novas fotos, as imagens atuais serão preservadas.</small>
+                </div>
+                <div class="form-group form-full">
+                  <label for="prop-desc">Descrição Detalhada do Imóvel *</label>
+                  <textarea id="prop-desc" required placeholder="Descreva as qualidades, diferenciais, armários planejados, área de lazer, etc..." style="min-height: 120px;"></textarea>
+                </div>
+              </div>
+              <div style="display: flex; gap: 15px; align-items: center; margin-top: 20px;">
+                <button type="submit" id="admin-form-submit-btn" class="btn-primary">Adicionar Imóvel ao Catálogo</button>
+                <button type="button" id="admin-form-cancel-btn" class="btn-secondary" onclick="cancelEditProperty()" style="display: none; background: transparent; border-color: var(--text-light); color: var(--text-light); box-shadow: none;">Cancelar Edição</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- PROPERTIES LIST TABLE -->
+          <div class="admin-table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Imóvel</th>
+                  <th>Tipo</th>
+                  <th>Bairro</th>
+                  <th>Preço</th>
+                  <th style="text-align: center;">Visualizações</th>
+                  <th style="text-align: center;">Cliques WhatsApp</th>
+                  <th style="width: 100px; text-align: center;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="admin-properties-table-body">
+                <!-- Populated via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ADMIN TAB: REQUESTS -->
+        <div id="admin-tab-requests" class="admin-container">
+          <div class="admin-table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Contato</th>
+                  <th>Imóvel</th>
+                  <th>Bairro</th>
+                  <th>Área</th>
+                  <th>Mensagem</th>
+                  <th style="width: 100px;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="admin-requests-table-body">
+                <!-- Populated via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+  </main>
+
+  <!-- Detail Property Modal -->
+  <div class="modal-overlay" id="property-modal">
+    <div class="modal-container">
+      <button class="modal-close" onclick="closePropertyModal()">&times;</button>
+      
+      <!-- Modal Header Gallery -->
+      <div class="modal-gallery" style="position: relative;">
+        <img id="modal-image" src="" alt="Imagem do Imóvel" class="modal-gallery-img" style="cursor: pointer;" onclick="openFullscreenViewer()" title="Clique para ver em tela cheia">
+        <button onclick="openFullscreenViewer()" class="btn-fullscreen-trigger" style="position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.65); border: none; border-radius: 8px; padding: 10px 14px; color: #fff; font-size: 0.85rem; font-family: var(--font-sub); font-weight: 500; cursor: pointer; z-index: 6; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.25); transition: 0.3s; backdrop-filter: blur(5px);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg>
+          Tela Cheia
+        </button>
+        <button onclick="changeModalPhoto(-1)" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); border: none; border-radius: 50%; width: 44px; height: 44px; color: #fff; font-size: 1.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; box-shadow: 0 2px 10px rgba(0,0,0,0.3); transition: 0.2s;">&#8249;</button>
+        <button onclick="changeModalPhoto(1)" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); border: none; border-radius: 50%; width: 44px; height: 44px; color: #fff; font-size: 1.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; box-shadow: 0 2px 10px rgba(0,0,0,0.3); transition: 0.2s;">&#8250;</button>
+      </div>
+      <!-- Thumbnails gallery -->
+      <div id="modal-thumbnails" style="display: flex; gap: 10px; overflow-x: auto; padding: 15px 40px; background: var(--bg-section); border-bottom: 1px solid var(--border-color);">
+        <!-- Populated dynamically via JavaScript -->
+      </div>
+      
+      <!-- Modal Inner Details -->
+      <div class="modal-content">
+        <div class="modal-header-meta">
+          <div class="modal-title">
+            <span id="modal-badge-status" class="property-badge-status" style="position: static; display: inline-block; margin-bottom: 10px;">VENDA</span>
+            <h2 id="modal-title-text">Título da Propriedade</h2>
+            <div class="property-location">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+              <span id="modal-location-text">Bairro, Curitiba</span>
+            </div>
+          </div>
+          <div id="modal-price-text" class="property-price">R$ 0,00</div>
+        </div>
+        
+        <!-- Specs Bar -->
+        <div class="modal-specs">
+          <div class="spec-box">
+            <h4>Área Privativa</h4>
+            <p><span id="modal-spec-area">0</span> m²</p>
+          </div>
+          <div class="spec-box">
+            <h4>Quartos</h4>
+            <p><span id="modal-spec-beds">0</span></p>
+          </div>
+          <div class="spec-box">
+            <h4>Banheiros</h4>
+            <p><span id="modal-spec-baths">0</span></p>
+          </div>
+          <div class="spec-box">
+            <h4>Vagas</h4>
+            <p><span id="modal-spec-vagas">0</span></p>
+          </div>
+        </div>
+        
+        <!-- Description -->
+        <div class="modal-desc-section">
+          <h3>Descrição do Imóvel</h3>
+          <p id="modal-desc-content" class="modal-desc-text">Descrição detalhada do imóvel...</p>
+        </div>
+        
+        <!-- Google Maps Location -->
+        <div id="modal-map-container" style="margin-top: 35px; border-top: 1px solid var(--border-color); padding-top: 30px;">
+          <h3 style="font-family: var(--font-title); font-size: 1.4rem; color: var(--primary-color); margin-bottom: 15px;">Localização</h3>
+          <div style="border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); height: 280px; background: var(--bg-section); margin-bottom: 12px;">
+            <iframe id="modal-map-iframe" src="" style="width: 100%; height: 100%; border: none;" allowfullscreen="" loading="lazy"></iframe>
+          </div>
+          <p id="modal-address-text" style="font-size: 0.85rem; color: var(--text-light); margin-top: 10px; display: flex; align-items: center; gap: 6px; margin-bottom: 20px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+            <span>Endereço: Carregando...</span>
+          </p>
+        </div>
+        
+        <!-- Contact Footer -->
+        <div class="modal-footer-contact">
+          <div class="broker-card-mini">
+            <img src="assets/edicleia_profile.jpg" alt="Edicleia Borba Vieira">
+            <div>
+              <h4>Edicleia Borba Vieira</h4>
+              <p>Corretora de Imóveis • CRECI 14269</p>
+            </div>
+          </div>
+          <a id="modal-whatsapp-link" href="#" target="_blank" class="btn-primary" onclick="trackWaClick()" style="background-color: #25D366; box-shadow: 0 4px 15px rgba(37, 211, 102, 0.3);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+            Falar no WhatsApp
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-container">
+      <div class="footer-brand">
+        <div class="brand">
+          <!-- Logo Clone for Footer -->
+          <img src="assets/logo_icon.png" alt="EBV Imóveis" class="brand-logo-img" style="filter: brightness(0) invert(1); width: 40px; height: 40px;">
+          <div class="brand-text">
+            <span class="brand-title" style="color: var(--bg-clean);">EBV Imóveis</span>
+            <span class="brand-subtitle">Curitiba</span>
+          </div>
+        </div>
+        <p>Mais de 25 anos de experiência transformando transações em realizações com ética, profissionalismo e amor ao cliente.</p>
+      </div>
+
+      <div class="footer-col">
+        <h4>Navegação</h4>
+        <ul class="footer-links">
+          <li><a href="#home" onclick="navigateTo('home')">Início</a></li>
+          <li><a href="#imoveis" onclick="navigateTo('imoveis')">Imóveis</a></li>
+          <li><a href="#avaliacao" onclick="navigateTo('avaliacao')">Avaliação</a></li>
+          <li><a href="#sobre" onclick="navigateTo('sobre')">Sobre a Corretora</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Contatos</h4>
+        <div class="footer-contact-info">
+          <div class="footer-contact-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+            <span>(41) 98802-4346</span>
+          </div>
+          <div class="footer-contact-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            <span>contato@ebvimoveiscuritiba.com.br</span>
+          </div>
+          <div class="footer-contact-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+            <span>Curitiba - Paraná</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-col">
+        <h4>Registro Profissional</h4>
+        <p style="color: rgba(255, 255, 255, 0.6); font-size: 0.9rem; line-height: 1.6;">
+          Edicleia Borba Vieira<br>
+          CRECI-PR: 14269<br>
+          Avaliadora Imobiliária
+        </p>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <span>&copy; 2026 EBV Imóveis. Todos os direitos reservados.</span>
+      <div class="footer-bottom-links">
+        <a href="#termos" onclick="navigateTo('termos')">Termos de Uso</a>
+        <a href="#privacidade" onclick="navigateTo('privacidade')">Política de Privacidade</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Login Modal for Admin Panel -->
+  <div class="modal-overlay" id="login-modal">
+    <div class="modal-container" style="max-width: 400px; padding: 40px;">
+      <button class="modal-close" onclick="closeLoginModal()">&times;</button>
+      <div style="text-align: center; margin-bottom: 30px;">
+        <img src="assets/logo_icon.png" alt="EBV Imóveis" style="height: 60px; margin-bottom: 15px;">
+        <h3 style="font-family: var(--font-title); font-size: 1.6rem; color: var(--primary-color);">Área Restrita</h3>
+        <p style="font-size: 0.85rem; color: var(--text-light);">Insira suas credenciais de acesso</p>
+      </div>
+      
+      <div class="success-alert" id="login-error" style="background-color: #FCE4D6; border-color: #F8CBAD; color: #C00000; padding: 12px; margin-bottom: 20px; font-size: 0.85rem; display: none;">
+        Usuário ou senha incorretos.
+      </div>
+      
+      <form id="login-form" onsubmit="submitLogin(event)">
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label for="login-username">E-mail ou Usuário</label>
+          <input type="text" id="login-username" required placeholder="Ex: contato@ebvimoveiscuritiba.com.br" style="background: var(--bg-section);">
+        </div>
+        <div class="form-group" style="margin-bottom: 30px;">
+          <label for="login-password">Senha</label>
+          <input type="password" id="login-password" required placeholder="Digite sua senha" style="background: var(--bg-section);">
+        </div>
+        <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Entrar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- LGPD Consent Banner -->
+  <div id="lgpd-banner" style="position: fixed; bottom: -250px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 900px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--border-color); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); padding: 20px 30px; display: flex; align-items: center; justify-content: space-between; gap: 20px; z-index: 9999; transition: bottom 0.5s cubic-bezier(0.16, 1, 0.3, 1); flex-wrap: wrap; margin-bottom: 20px;">
+    <div style="flex: 1; min-width: 280px;">
+      <h4 style="font-family: var(--font-sub); font-weight: 700; color: var(--text-dark); margin-bottom: 6px; font-size: 0.95rem;">Valorizamos sua Privacidade (LGPD)</h4>
+      <p style="font-size: 0.85rem; color: var(--text-light); line-height: 1.5; margin: 0;">
+        EBV Imóveis utiliza cookies para melhorar sua experiência. Ao preencher nossos formulários, você concorda com a coleta e tratamento de dados para fins de atendimento comercial de acordo com nossos <a href="#termos" onclick="navigateTo('termos')" style="color: var(--primary-color); font-weight: 600; text-decoration: underline;">Termos de Uso</a> e <a href="#privacidade" onclick="navigateTo('privacidade')" style="color: var(--primary-color); font-weight: 600; text-decoration: underline;">Política de Privacidade</a>.
+      </p>
+    </div>
+    <div style="display: flex; gap: 12px; align-items: center; flex-shrink: 0; flex-wrap: wrap;">
+      <button onclick="rejectLgpdConsent()" style="padding: 10px 20px; border-radius: 30px; border: 1px solid var(--border-color); background: transparent; color: var(--text-light); font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: 0.2s; box-shadow: none;">Recusar</button>
+      <button onclick="acceptLgpdConsent()" class="btn-primary" style="padding: 10px 24px; border-radius: 30px; font-size: 0.8rem; font-weight: 600; box-shadow: none;">Aceitar Todos</button>
+    </div>
+  </div>
+
+  <!-- Fullscreen Image Viewer Modal -->
+  <div id="fullscreen-viewer" class="fullscreen-viewer" style="display: none;">
+    <span class="close-fullscreen" onclick="closeFullscreenViewer()">&times;</span>
+    <button class="nav-fullscreen-btn prev" onclick="changeFullscreenPhoto(-1)">&#8249;</button>
+    <img id="fullscreen-image" src="" alt="Property Image Fullscreen">
+    <button class="nav-fullscreen-btn next" onclick="changeFullscreenPhoto(1)">&#8250;</button>
+    <div id="fullscreen-counter" style="position: absolute; bottom: 30px; color: #fff; font-family: var(--font-sub); font-size: 0.9rem; background: rgba(255,255,255,0.1); padding: 6px 18px; border-radius: 20px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15);">1 / 1</div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

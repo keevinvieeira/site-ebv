@@ -1,0 +1,9 @@
+# Environment and secrets
+.env
+.env.local
+
+# Temp and system files
+.system_generated/
+*.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,55 @@
+{
+  "summary": {
+    "scanned_files": 4,
+    "secrets_found": 0,
+    "vulns_found": 5,
+    "config_issues": 0
+  },
+  "findings": [
+    {
+      "category": "Code Vulnerability",
+      "title": "DOM XSS - Unsafe innerHTML assignment",
+      "severity": "HIGH",
+      "file": "app.js",
+      "line": 354,
+      "snippet": "card.innerHTML = `",
+      "recommendation": "Refactor unsafe pattern. Use safe DOM API (textContent), parameterized queries, or sanitized input."
+    },
+    {
+      "category": "Code Vulnerability",
+      "title": "DOM XSS - Unsafe innerHTML assignment",
+      "severity": "HIGH",
+      "file": "app.js",
+      "line": 488,
+      "snippet": "emptyDiv.innerHTML = `<svg width=\"48\" height=\"48\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" style=\"margin-bottom: 15px;\"><circle cx=\"12\" cy=\"12\" r=\"10\"></circle><line x1=\"8\" y1=\"12\" x2=\"16\" y2=\"12\"></line></svg><p>Nenhum im\u00f3vel encontrado com as op\u00e7\u00f5es selecionadas.</p>`;",
+      "recommendation": "Refactor unsafe pattern. Use safe DOM API (textContent), parameterized queries, or sanitized input."
+    },
+    {
+      "category": "Code Vulnerability",
+      "title": "DOM XSS - Unsafe innerHTML assignment",
+      "severity": "HIGH",
+      "file": "app.js",
+      "line": 967,
+      "snippet": "tr.innerHTML = `",
+      "recommendation": "Refactor unsafe pattern. Use safe DOM API (textContent), parameterized queries, or sanitized input."
+    },
+    {
+      "category": "Code Vulnerability",
+      "title": "DOM XSS - Unsafe innerHTML assignment",
+      "severity": "HIGH",
+      "file": "app.js",
+      "line": 992,
+      "snippet": "reqsBody.innerHTML = `",
+      "recommendation": "Refactor unsafe pattern. Use safe DOM API (textContent), parameterized queries, or sanitized input."
+    },
+    {
+      "category": "Code Vulnerability",
+      "title": "DOM XSS - Unsafe innerHTML assignment",
+      "severity": "HIGH",
+      "file": "app.js",
+      "line": 1010,
+      "snippet": "tr.innerHTML = `",
+      "recommendation": "Refactor unsafe pattern. Use safe DOM API (textContent), parameterized queries, or sanitized input."
+    }
+  ]
+}
