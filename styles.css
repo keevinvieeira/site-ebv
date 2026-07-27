@@ -78,9 +78,9 @@ header.scrolled {
 }
 
 .nav-container {
-  max-width: 1200px;
+  max-width: 1800px;
   margin: 0 auto;
-  padding: 15px 20px;
+  padding: 15px 40px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -217,11 +217,17 @@ main {
   transform: translateY(0);
 }
 
-/* Hero Section */
+/* Hero Section - Responsive Fullscreen Layout (100vw x 100dvh) */
 .hero {
   position: relative;
-  height: 80vh;
-  min-height: 500px;
+  width: 100%;
+  width: 100vw;
+  min-height: 100vh;
+  min-height: 100dvh;
+  height: 100dvh;
+  margin-top: -80px;
+  padding-top: 90px;
+  padding-bottom: 30px;
   background: linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.55)), url('assets/hero_bg.jpg') no-repeat center center/cover;
   display: flex;
   flex-direction: column;
@@ -229,11 +235,15 @@ main {
   align-items: center;
   text-align: center;
   color: var(--bg-clean);
-  padding: 0 20px;
+  padding-left: 20px;
+  padding-right: 20px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .hero-content {
-  max-width: 800px;
+  max-width: 900px;
+  margin: auto 0 0 0;
   animation: fadeInUp 1s ease;
 }
 
@@ -252,14 +262,14 @@ main {
   font-size: 3.5rem;
   font-weight: 700;
   line-height: 1.2;
-  margin-bottom: 25px;
+  margin-bottom: 20px;
 }
 
 .hero-sub {
   font-size: 1.2rem;
   font-weight: 300;
   color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 40px;
+  margin-bottom: 25px;
 }
 
 /* Dynamic Search Bar inside Hero */
@@ -272,10 +282,10 @@ main {
   border-radius: 12px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   padding: 20px;
-  margin: 0 auto;
+  margin: 0 auto auto 0;
   color: var(--text-dark);
   text-align: left;
-  transform: translateY(30px);
+  transform: translateY(0);
 }
 
 .search-tabs {
@@ -1513,12 +1523,20 @@ footer {
 }
 
 @media (max-width: 768px) {
+  .hero {
+    height: auto;
+    min-height: 100dvh;
+    padding-top: 95px;
+    padding-bottom: 35px;
+  }
+
   .hero h1 {
-    font-size: 2.5rem;
+    font-size: 2.2rem;
   }
   
   .hero-sub {
-    font-size: 1rem;
+    font-size: 0.95rem;
+    margin-bottom: 20px;
   }
   
   .search-container {
