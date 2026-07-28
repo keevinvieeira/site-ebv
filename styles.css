@@ -201,15 +201,22 @@ nav ul li a.active::after {
 
 /* Page Wrapper & Routing Visibility */
 main {
-  margin-top: 80px;
   width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 .page {
   display: none;
   opacity: 0;
   width: 100%;
+  margin: 0;
+  padding: 90px 0 0 0;
   transition: opacity 0.4s ease;
+}
+
+#page-home {
+  padding-top: 0 !important;
 }
 
 .page.active {
@@ -218,20 +225,15 @@ main {
   width: 100%;
 }
 
-/* Hero Section - Responsive Fullscreen Layout (100vw x 100dvh) */
+/* Hero Section - Clean 100% Fullscreen Layout */
 .hero {
   position: relative;
-  width: 100vw;
-  left: 50%;
-  right: 50%;
-  margin-left: -50vw;
-  margin-right: -50vw;
+  width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
   height: 100dvh;
-  margin-top: -80px;
-  padding-top: 90px;
-  padding-bottom: 30px;
+  margin: 0;
+  padding: 100px 20px 40px;
   background-image: linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.55)), url('assets/hero_bg.jpg');
   background-repeat: no-repeat;
   background-position: center center;
@@ -242,8 +244,6 @@ main {
   align-items: center;
   text-align: center;
   color: var(--bg-clean);
-  padding-left: 20px;
-  padding-right: 20px;
   box-sizing: border-box;
   overflow: hidden;
 }
