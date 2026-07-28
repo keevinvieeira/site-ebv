@@ -202,29 +202,26 @@ nav ul li a.active::after {
 /* Page Wrapper & Routing Visibility */
 main {
   margin-top: 80px;
+  width: 100%;
 }
 
 .page {
   display: none;
   opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.5s ease, transform 0.5s ease;
+  width: 100%;
+  transition: opacity 0.4s ease;
 }
 
 .page.active {
   display: block;
   opacity: 1;
-  transform: translateY(0);
+  width: 100%;
 }
 
-/* Hero Section - Responsive Fullscreen Layout (100vw x 100dvh) */
+/* Hero Section - Responsive Fullscreen Layout (100% x 100dvh) */
 .hero {
   position: relative;
-  width: 100vw;
-  left: 50%;
-  right: 50%;
-  margin-left: -50vw;
-  margin-right: -50vw;
+  width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
   height: 100dvh;
