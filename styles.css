@@ -218,17 +218,24 @@ main {
   width: 100%;
 }
 
-/* Hero Section - Responsive Fullscreen Layout (100% x 100dvh) */
+/* Hero Section - Responsive Fullscreen Layout (100vw x 100dvh) */
 .hero {
   position: relative;
-  width: 100%;
+  width: 100vw;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
   min-height: 100vh;
   min-height: 100dvh;
   height: 100dvh;
   margin-top: -80px;
   padding-top: 90px;
   padding-bottom: 30px;
-  background: linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.55)), url('assets/hero_bg.jpg') no-repeat center center/cover;
+  background-image: linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.55)), url('assets/hero_bg.jpg');
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
   display: flex;
   flex-direction: column;
   justify-content: center;
