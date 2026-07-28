@@ -228,11 +228,12 @@ main {
 /* Hero Section - Clean 100% Fullscreen Layout */
 .hero {
   position: relative;
-  width: 100%;
+  width: 100% !important;
+  max-width: 100% !important;
   min-height: 100vh;
   min-height: 100dvh;
   height: 100dvh;
-  margin: 0;
+  margin: 0 !important;
   padding: 100px 20px 40px;
   background-image: linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.55)), url('assets/hero_bg.jpg');
   background-repeat: no-repeat;
