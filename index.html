@@ -505,9 +505,26 @@
                   <input type="number" id="prop-vagas" placeholder="Ex: 2">
                 </div>
                 <div class="form-group" style="grid-column: span 2;">
-                  <label for="prop-files">Adicionar Fotos do Imóvel <span id="prop-files-star">*</span> (Selecione uma ou mais fotos do seu computador)</label>
-                  <input type="file" id="prop-files" multiple accept="image/*" required style="background: var(--bg-section); padding: 10px; border: 1px dashed var(--border-color); border-radius: 8px; width: 100%; cursor: pointer;">
-                  <small id="prop-files-help" style="display: none; color: var(--text-light); font-size: 0.8rem; margin-top: 5px;">Caso não selecione novas fotos, as imagens atuais serão preservadas.</small>
+                  <label for="prop-files">Adicionar Fotos do Imóvel (Selecione 1 ou mais fotos do seu computador, até 50+ de uma vez)</label>
+                  <input type="file" id="prop-files" multiple accept="image/*" onchange="handleBatchPhotoUpload(event)" style="background: var(--bg-section); padding: 10px; border: 1px dashed var(--primary-color); border-radius: 8px; width: 100%; cursor: pointer;">
+                  <small id="prop-files-help" style="display: block; color: var(--text-light); font-size: 0.8rem; margin-top: 5px;">Você pode adicionar mais fotos a qualquer momento. Clique no "X" para remover fotos indesejadas.</small>
+                  
+                  <!-- Batch Upload Progress Indicator -->
+                  <div id="admin-photo-progress" style="display: none; margin-top: 10px; padding: 12px; background: rgba(114, 47, 55, 0.08); border-radius: 8px; font-size: 0.85rem; color: var(--primary-color); font-weight: 600; text-align: center;">
+                    <span id="admin-photo-progress-text">Processando imagens...</span>
+                    <div style="width: 100%; height: 6px; background: rgba(0,0,0,0.1); border-radius: 3px; margin-top: 8px; overflow: hidden;">
+                      <div id="admin-photo-progress-bar" style="width: 0%; height: 100%; background: var(--primary-color); transition: width 0.2s ease;"></div>
+                    </div>
+                  </div>
+
+                  <!-- Interactive Admin Photo Gallery Preview -->
+                  <div id="admin-photo-gallery-wrapper" style="margin-top: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                      <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-dark);">Fotos do Imóvel (<span id="admin-photo-count">0</span>):</span>
+                      <small style="color: var(--text-light); font-size: 0.75rem;">A 1ª foto é a capa principal. Clique no "X" para remover.</small>
+                    </div>
+                    <div id="admin-photo-grid" class="admin-photo-grid"></div>
+                  </div>
                 </div>
                 <div class="form-group form-full">
                   <label for="prop-desc">Descrição Detalhada do Imóvel *</label>

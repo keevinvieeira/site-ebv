@@ -125,11 +125,12 @@ let properties = [];
 let appraisals = [];
 let targetNavigatePage = null; // Temp storage for navigation when locked
 
-// Modal Photo Gallery State
+// Modal Photo Gallery & Admin Form State
 let currentModalImages = [];
 let currentModalPhotoIndex = 0;
 let activeModalPropertyId = null; // Global tracker for currently viewed property
 let editingPropertyId = null;     // Global tracker for currently edited property
+let currentFormImages = [];       // Dynamic images list for admin property form
 
 // Initialize Application
 document.addEventListener("DOMContentLoaded", () => {
@@ -140,6 +141,7 @@ document.addEventListener("DOMContentLoaded", () => {
   checkLgpdConsent();
   updateAdminDashboard();
   setupScrollEffects();
+  renderAdminPhotoGallery();
   
   // Close fullscreen viewer when clicking overlay background
   const fViewer = document.getElementById("fullscreen-viewer");
@@ -762,6 +764,144 @@ function switchAdminTab(tabName, btnElement) {
   document.getElementById(`admin-tab-${tabName}`).classList.add("active");
 }
 
+// Compress and resize uploaded image file via HTML5 Canvas (Max 1600px width/height, 82% JPEG quality)
+function compressImageFile(file, maxWidth = 1600, quality = 0.82) {
+  return new Promise((resolve) => {
+    if (!file || !file.type.startsWith("image/")) {
+      resolve(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth || height > maxWidth) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxWidth) / height);
+            height = maxWidth;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        resolve(dataUrl);
+      };
+      img.onerror = () => resolve(e.target.result);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Handle Batch Photo Upload (Supports 50+ photos with live progress indicator)
+async function handleBatchPhotoUpload(event) {
+  const files = Array.from(event.target.files);
+  if (!files || files.length === 0) return;
+
+  const progressContainer = document.getElementById("admin-photo-progress");
+  const progressText = document.getElementById("admin-photo-progress-text");
+  const progressBar = document.getElementById("admin-photo-progress-bar");
+
+  if (progressContainer) progressContainer.style.display = "block";
+
+  const total = files.length;
+  for (let i = 0; i < total; i++) {
+    const pct = Math.round(((i + 1) / total) * 100);
+    if (progressText) progressText.textContent = `Processando foto ${i + 1} de ${total}... (${pct}%)`;
+    if (progressBar) progressBar.style.width = `${pct}%`;
+
+    const compressedDataUrl = await compressImageFile(files[i]);
+    if (compressedDataUrl) {
+      currentFormImages.push(compressedDataUrl);
+    }
+  }
+
+  if (progressContainer) {
+    if (progressText) progressText.textContent = `✅ ${total} foto(s) adicionada(s) com sucesso!`;
+    setTimeout(() => {
+      progressContainer.style.display = "none";
+      if (progressBar) progressBar.style.width = "0%";
+    }, 2000);
+  }
+
+  // Reset file input so user can select another batch if desired
+  event.target.value = "";
+
+  renderAdminPhotoGallery();
+}
+
+// Render Admin Photo Gallery Preview Grid with Individual "X" Delete Buttons
+function renderAdminPhotoGallery() {
+  const countEl = document.getElementById("admin-photo-count");
+  const gridEl = document.getElementById("admin-photo-grid");
+  if (!gridEl) return;
+
+  if (countEl) countEl.textContent = currentFormImages.length;
+
+  if (currentFormImages.length === 0) {
+    gridEl.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 25px; color: var(--text-light); font-size: 0.85rem;">
+        📷 Nenhuma foto adicionada. Clique no botão de upload acima para escolher 1 ou mais fotos (até 50+ de uma vez).
+      </div>
+    `;
+    return;
+  }
+
+  gridEl.replaceChildren();
+
+  currentFormImages.forEach((imgSrc, idx) => {
+    const card = document.createElement("div");
+    card.className = "admin-photo-card";
+
+    const img = document.createElement("img");
+    img.src = imgSrc;
+    img.alt = `Foto ${idx + 1}`;
+    img.loading = "lazy";
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "admin-photo-remove-btn";
+    removeBtn.innerHTML = "&times;";
+    removeBtn.title = "Excluir esta foto";
+    removeBtn.onclick = (e) => {
+      e.stopPropagation();
+      removePhotoFromForm(idx);
+    };
+
+    card.appendChild(img);
+    card.appendChild(removeBtn);
+
+    if (idx === 0) {
+      const badge = document.createElement("span");
+      badge.className = "admin-photo-badge";
+      badge.textContent = "Capa";
+      card.appendChild(badge);
+    }
+
+    gridEl.appendChild(card);
+  });
+}
+
+// Remove Individual Photo from Form List
+function removePhotoFromForm(index) {
+  if (index >= 0 && index < currentFormImages.length) {
+    currentFormImages.splice(index, 1);
+    renderAdminPhotoGallery();
+  }
+}
+
 // Edit existing property (Loads fields into form)
 function editProperty(id) {
   const prop = properties.find(p => p.id === id);
@@ -781,16 +921,14 @@ function editProperty(id) {
   document.getElementById("prop-vagas").value = prop.vagas || "";
   document.getElementById("prop-desc").value = prop.desc;
 
+  // Load existing property photos into gallery
+  currentFormImages = prop.images && prop.images.length > 0 ? [...prop.images] : (prop.image ? [prop.image] : []);
+  renderAdminPhotoGallery();
+
   // Dynamic UI feedback for Edit mode
   document.getElementById("admin-form-title").textContent = "Editar Imóvel";
   document.getElementById("admin-form-submit-btn").textContent = "Salvar Alterações";
   document.getElementById("admin-form-cancel-btn").style.display = "inline-block";
-
-  // Make files input optional during editing
-  const fileInput = document.getElementById("prop-files");
-  fileInput.required = false;
-  document.getElementById("prop-files-star").style.display = "none";
-  document.getElementById("prop-files-help").style.display = "block";
 
   // Smooth scroll to the form card
   const formCard = document.querySelector(".form-card");
@@ -802,25 +940,26 @@ function editProperty(id) {
 // Cancel Edit Mode
 function cancelEditProperty() {
   editingPropertyId = null;
+  currentFormImages = [];
 
   // Reset form
   document.getElementById("new-property-form").reset();
+  renderAdminPhotoGallery();
 
   // Restore dynamic UI elements
   document.getElementById("admin-form-title").textContent = "Cadastrar Novo Imóvel";
   document.getElementById("admin-form-submit-btn").textContent = "Adicionar Imóvel ao Catálogo";
   document.getElementById("admin-form-cancel-btn").style.display = "none";
-
-  // Restore files input required state
-  const fileInput = document.getElementById("prop-files");
-  fileInput.required = true;
-  document.getElementById("prop-files-star").style.display = "inline";
-  document.getElementById("prop-files-help").style.display = "none";
 }
 
-// Save New Property or Update Existing via Admin Panel (Async reading uploaded files)
+// Save New Property or Update Existing via Admin Panel
 async function saveNewProperty(event) {
   event.preventDefault();
+
+  if (currentFormImages.length === 0) {
+    alert("Por favor, adicione pelo menos 1 foto para o imóvel!");
+    return;
+  }
 
   const title = document.getElementById("prop-title").value;
   const status = "venda";
@@ -834,27 +973,10 @@ async function saveNewProperty(event) {
   const vagas = parseInt(document.getElementById("prop-vagas").value) || 0;
   const desc = document.getElementById("prop-desc").value;
 
-  const fileInput = document.getElementById("prop-files");
-  const files = fileInput.files;
-  
   if (editingPropertyId) {
     const idx = properties.findIndex(p => p.id === editingPropertyId);
     if (idx !== -1) {
       const prop = properties[idx];
-      let newImages = [];
-
-      if (files && files.length > 0) {
-        const readPromises = Array.from(files).map(file => {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target.result);
-            reader.readAsDataURL(file);
-          });
-        });
-        newImages = await Promise.all(readPromises);
-      } else {
-        newImages = prop.images;
-      }
 
       properties[idx] = {
         ...prop,
@@ -869,31 +991,17 @@ async function saveNewProperty(event) {
         baths,
         vagas,
         desc,
-        image: newImages[0] || prop.image,
-        images: newImages
+        image: currentFormImages[0],
+        images: [...currentFormImages]
       };
 
       saveState();
       cancelEditProperty();
       renderFeaturedProperties();
       renderCatalogProperties();
-      alert("Imóvel atualizado com sucesso!");
+      alert("Imóvel e fotos atualizados com sucesso!");
     }
   } else {
-    let images = [];
-    if (files && files.length > 0) {
-      const readPromises = Array.from(files).map(file => {
-        return new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target.result);
-          reader.readAsDataURL(file);
-        });
-      });
-      images = await Promise.all(readPromises);
-    } else {
-      images = ["assets/sobrado_real.jpg"];
-    }
-
     const newProperty = {
       id: "prop-" + Date.now(),
       title,
@@ -908,15 +1016,15 @@ async function saveNewProperty(event) {
       vagas,
       views: 0,
       waClicks: 0,
-      image: images[0],
-      images: images,
+      image: currentFormImages[0],
+      images: [...currentFormImages],
       desc
     };
 
     properties.unshift(newProperty);
     saveState();
 
-    document.getElementById("new-property-form").reset();
+    cancelEditProperty();
     renderFeaturedProperties();
     renderCatalogProperties();
 
