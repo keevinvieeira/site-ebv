@@ -133,8 +133,8 @@ let editingPropertyId = null;     // Global tracker for currently edited propert
 let currentFormImages = [];       // Dynamic images list for admin property form
 
 // Initialize Application
-document.addEventListener("DOMContentLoaded", () => {
-  loadState();
+document.addEventListener("DOMContentLoaded", async () => {
+  await loadStateAsync();
   renderFeaturedProperties();
   renderCatalogProperties();
   populateSearchFilters();
@@ -166,40 +166,104 @@ function setupScrollEffects() {
   });
 }
 
-// LocalStorage State Handlers (with cache migrator to support photo galleries and clean up old data)
-function loadState() {
-  const localProps = localStorage.getItem("ebv_properties");
-  if (localProps) {
-    const parsed = JSON.parse(localProps);
-    const testProp = parsed.find(p => p.id === "prop-default-jba-1");
-    // Trigger reset if old properties exist, or if the JBA Uberaba Sobrado uses remote URLs instead of local copied assets
-    const needsMigration = !testProp || !testProp.images || testProp.images.length < 2 || !testProp.image.startsWith("assets/") || parsed.some(p => p.id === "prop-default-3" || p.id === "prop-default-4");
-    
-    if (needsMigration) {
-      properties = [...DEFAULT_PROPERTIES];
-      localStorage.setItem("ebv_properties", JSON.stringify(properties));
-    } else {
-      properties = parsed;
+// High-Capacity IndexedDB & LocalStorage Hybrid Engine (Supports 50+ photos per property)
+const DB_NAME = "EBV_Database_v1";
+const DB_VERSION = 1;
+
+function openDB() {
+  return new Promise((resolve) => {
+    if (!window.indexedDB) {
+      resolve(null);
+      return;
     }
-  } else {
-    properties = [...DEFAULT_PROPERTIES];
-    localStorage.setItem("ebv_properties", JSON.stringify(properties));
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains("properties")) {
+        db.createObjectStore("properties");
+      }
+      if (!db.objectStoreNames.contains("appraisals")) {
+        db.createObjectStore("appraisals");
+      }
+    };
+    request.onsuccess = (e) => resolve(e.target.result);
+    request.onerror = () => resolve(null);
+  });
+}
+
+async function loadStateAsync() {
+  try {
+    const db = await openDB();
+    if (db) {
+      const tx = db.transaction(["properties", "appraisals"], "readonly");
+      const propStore = tx.objectStore("properties");
+      const appStore = tx.objectStore("appraisals");
+
+      const propReq = propStore.get("list");
+      const appReq = appStore.get("list");
+
+      const dbProps = await new Promise((res) => { propReq.onsuccess = () => res(propReq.result); propReq.onerror = () => res(null); });
+      const dbApps = await new Promise((res) => { appReq.onsuccess = () => res(appReq.result); appReq.onerror = () => res(null); });
+
+      if (dbProps && Array.isArray(dbProps) && dbProps.length > 0) {
+        properties = dbProps;
+      }
+      if (dbApps && Array.isArray(dbApps)) {
+        appraisals = dbApps;
+      }
+    }
+  } catch (err) {
+    console.warn("IndexedDB load warning:", err);
   }
 
-  const localAppraisals = localStorage.getItem("ebv_appraisals");
-  if (localAppraisals) {
-    appraisals = JSON.parse(localAppraisals);
-  } else {
-    appraisals = [];
-    localStorage.setItem("ebv_appraisals", JSON.stringify(appraisals));
+  // LocalStorage Fallback if IndexedDB had no data
+  if (!properties || properties.length === 0) {
+    const localProps = localStorage.getItem("ebv_properties");
+    if (localProps) {
+      try {
+        const parsed = JSON.parse(localProps);
+        properties = Array.isArray(parsed) && parsed.length > 0 ? parsed : [...DEFAULT_PROPERTIES];
+      } catch (e) {
+        properties = [...DEFAULT_PROPERTIES];
+      }
+    } else {
+      properties = [...DEFAULT_PROPERTIES];
+    }
+  }
+
+  if (!appraisals || appraisals.length === 0) {
+    const localApps = localStorage.getItem("ebv_appraisals");
+    if (localApps) {
+      try { appraisals = JSON.parse(localApps); } catch (e) { appraisals = []; }
+    }
   }
 }
 
-function saveState() {
-  localStorage.setItem("ebv_properties", JSON.stringify(properties));
-  localStorage.setItem("ebv_appraisals", JSON.stringify(appraisals));
+async function saveStateAsync() {
+  try {
+    const db = await openDB();
+    if (db) {
+      const tx = db.transaction(["properties", "appraisals"], "readwrite");
+      tx.objectStore("properties").put(properties, "list");
+      tx.objectStore("appraisals").put(appraisals, "list");
+    }
+  } catch (err) {
+    console.warn("IndexedDB save warning:", err);
+  }
+
+  try {
+    localStorage.setItem("ebv_properties", JSON.stringify(properties));
+    localStorage.setItem("ebv_appraisals", JSON.stringify(appraisals));
+  } catch (quotaErr) {
+    console.warn("LocalStorage quota exceeded (safely stored in IndexedDB):", quotaErr);
+  }
+
   populateSearchFilters();
   updateAdminDashboard();
+}
+
+function saveState() {
+  saveStateAsync();
 }
 
 // Security & Authentication for Admin Panel
@@ -764,8 +828,8 @@ function switchAdminTab(tabName, btnElement) {
   document.getElementById(`admin-tab-${tabName}`).classList.add("active");
 }
 
-// Compress and resize uploaded image file via HTML5 Canvas (Max 1600px width/height, 82% JPEG quality)
-function compressImageFile(file, maxWidth = 1600, quality = 0.82) {
+// Compress and resize uploaded image file via HTML5 Canvas (Max 1200px width/height, 75% JPEG quality)
+function compressImageFile(file, maxWidth = 1200, quality = 0.75) {
   return new Promise((resolve) => {
     if (!file || !file.type.startsWith("image/")) {
       resolve(null);
@@ -961,25 +1025,58 @@ async function saveNewProperty(event) {
     return;
   }
 
-  const title = document.getElementById("prop-title").value;
-  const status = "venda";
-  const type = document.getElementById("prop-type").value;
-  const price = parseFloat(document.getElementById("prop-price").value);
-  const location = document.getElementById("prop-location").value;
-  const address = document.getElementById("prop-address").value;
-  const area = parseInt(document.getElementById("prop-area").value);
-  const beds = parseInt(document.getElementById("prop-beds").value);
-  const baths = parseInt(document.getElementById("prop-baths").value);
-  const vagas = parseInt(document.getElementById("prop-vagas").value) || 0;
-  const desc = document.getElementById("prop-desc").value;
+  const submitBtn = document.getElementById("admin-form-submit-btn");
+  const origBtnText = submitBtn ? submitBtn.textContent : "Salvar";
 
-  if (editingPropertyId) {
-    const idx = properties.findIndex(p => p.id === editingPropertyId);
-    if (idx !== -1) {
-      const prop = properties[idx];
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "⏳ Salvando imóvel e galeria...";
+  }
 
-      properties[idx] = {
-        ...prop,
+  try {
+    const title = document.getElementById("prop-title").value;
+    const status = "venda";
+    const type = document.getElementById("prop-type").value;
+    const price = parseFloat(document.getElementById("prop-price").value) || 0;
+    const location = document.getElementById("prop-location").value;
+    const address = document.getElementById("prop-address").value || "";
+    const area = parseInt(document.getElementById("prop-area").value) || 0;
+    const beds = parseInt(document.getElementById("prop-beds").value) || 0;
+    const baths = parseInt(document.getElementById("prop-baths").value) || 0;
+    const vagas = parseInt(document.getElementById("prop-vagas").value) || 0;
+    const desc = document.getElementById("prop-desc").value;
+
+    if (editingPropertyId) {
+      const idx = properties.findIndex(p => p.id === editingPropertyId);
+      if (idx !== -1) {
+        const prop = properties[idx];
+
+        properties[idx] = {
+          ...prop,
+          title,
+          status,
+          type,
+          price,
+          location,
+          address,
+          area,
+          beds,
+          baths,
+          vagas,
+          desc,
+          image: currentFormImages[0],
+          images: [...currentFormImages]
+        };
+
+        await saveStateAsync();
+        cancelEditProperty();
+        renderFeaturedProperties();
+        renderCatalogProperties();
+        alert("Imóvel e galeria de fotos salvos com sucesso!");
+      }
+    } else {
+      const newProperty = {
+        id: "prop-" + Date.now(),
         title,
         status,
         type,
@@ -990,45 +1087,30 @@ async function saveNewProperty(event) {
         beds,
         baths,
         vagas,
-        desc,
+        views: 0,
+        waClicks: 0,
         image: currentFormImages[0],
-        images: [...currentFormImages]
+        images: [...currentFormImages],
+        desc
       };
 
-      saveState();
+      properties.unshift(newProperty);
+      await saveStateAsync();
+
       cancelEditProperty();
       renderFeaturedProperties();
       renderCatalogProperties();
-      alert("Imóvel e fotos atualizados com sucesso!");
+
+      alert("Novo imóvel cadastrado com sucesso e adicionado ao catálogo!");
     }
-  } else {
-    const newProperty = {
-      id: "prop-" + Date.now(),
-      title,
-      status,
-      type,
-      price,
-      location,
-      address,
-      area,
-      beds,
-      baths,
-      vagas,
-      views: 0,
-      waClicks: 0,
-      image: currentFormImages[0],
-      images: [...currentFormImages],
-      desc
-    };
-
-    properties.unshift(newProperty);
-    saveState();
-
-    cancelEditProperty();
-    renderFeaturedProperties();
-    renderCatalogProperties();
-
-    alert("Imóvel cadastrado com sucesso e adicionado ao catálogo!");
+  } catch (err) {
+    console.error("Erro ao salvar imóvel:", err);
+    alert("Ocorreu um erro ao salvar o imóvel: " + err.message);
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = origBtnText;
+    }
   }
 }
 
