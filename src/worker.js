@@ -471,13 +471,11 @@ async function readJson(request, maxBytes) {
 }
 
 async function requireAdmin(request, env) {
-  if (!env.ADMIN_USERNAME || !env.SESSION_SECRET) {
-    console.error("Missing ADMIN_USERNAME or SESSION_SECRET binding");
-    return jsonError(500, "server_misconfigured", "Autenticação não configurada.");
+  const session = await readSession(request, env);
+  if (!session) {
+    return jsonError(401, "unauthorized", "Autenticação necessária.");
   }
-  return await readSession(request, env)
-    ? null
-    : jsonError(401, "unauthorized", "Autenticação necessária.");
+  return null;
 }
 
 async function readSession(request, env) {

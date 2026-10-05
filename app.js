@@ -1115,19 +1115,30 @@ function dataUrlToBlob(dataUrl) {
 }
 
 async function saveCatalogRemote() {
-  const migratedProperties = [];
-  for (const property of properties) {
-    const sourceImages = property.images?.length ? property.images : [property.image].filter(Boolean);
-    const images = await uploadPendingImages(sourceImages);
-    migratedProperties.push({ ...property, image: images[0] || "", images });
+  try {
+    const migratedProperties = [];
+    for (const property of properties) {
+      const sourceImages = property.images?.length ? property.images : [property.image].filter(Boolean);
+      let images = sourceImages;
+      try {
+        images = await uploadPendingImages(sourceImages);
+      } catch (imgErr) {
+        console.warn("Could not upload to cloud storage, keeping local images:", imgErr);
+        images = sourceImages;
+      }
+      migratedProperties.push({ ...property, image: images[0] || "", images });
+    }
+
+    await apiRequest("/api/admin/properties", {
+      method: "PUT",
+      body: JSON.stringify({ properties: migratedProperties })
+    });
+    properties = migratedProperties;
+  } catch (apiErr) {
+    console.warn("Could not sync with remote Cloudflare API, saving to local IndexedDB storage:", apiErr);
   }
 
-  await apiRequest("/api/admin/properties", {
-    method: "PUT",
-    body: JSON.stringify({ properties: migratedProperties })
-  });
-
-  properties = migratedProperties;
+  // Always save locally to high-capacity IndexedDB!
   await saveLocalStateAsync();
   populateSearchFilters();
   updateAdminDashboard();
