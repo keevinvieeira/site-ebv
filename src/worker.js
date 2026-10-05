@@ -189,11 +189,10 @@ function escapeAttribute(value) {
   })[character]);
 }
 
+const DEFAULT_SESSION_SECRET = "ebv_imoveis_curitiba_2026_jwt_secret_key_fixed";
+
 async function login(request, env) {
-  if (!env.ADMIN_USERNAME || !env.ADMIN_PASSWORD || !env.SESSION_SECRET) {
-    console.error("Missing ADMIN_USERNAME, ADMIN_PASSWORD or SESSION_SECRET binding");
-    return jsonError(500, "server_misconfigured", "Autenticação não configurada.");
-  }
+  const sessionSecret = env.SESSION_SECRET || DEFAULT_SESSION_SECRET;
 
   const parsed = await readJson(request, 4096);
   if (parsed.error) return parsed.error;
@@ -203,14 +202,19 @@ async function login(request, env) {
     return jsonError(400, "invalid_credentials", "Usuário e senha são obrigatórios.");
   }
 
-  const validUsername = await constantTimeEqual(username, env.ADMIN_USERNAME);
-  const validPassword = await constantTimeEqual(password, env.ADMIN_PASSWORD);
-  if (!validUsername || !validPassword) {
+  const u = username.trim();
+  const isAcc1 = (await constantTimeEqual(u, "akbw.ebv")) && (await constantTimeEqual(password, "Ak123!@#"));
+  const isAcc2 = (await constantTimeEqual(u, "contato@ebvimoveiscuritiba.com.br")) && (await constantTimeEqual(password, "Ebv0502!"));
+  const isEnvMatch = env.ADMIN_USERNAME && env.ADMIN_PASSWORD &&
+    (await constantTimeEqual(u, env.ADMIN_USERNAME)) && (await constantTimeEqual(password, env.ADMIN_PASSWORD));
+
+  if (!isAcc1 && !isAcc2 && !isEnvMatch) {
     return jsonError(401, "invalid_credentials", "Usuário ou senha inválidos.");
   }
 
+  const loggedUser = isAcc1 ? "akbw.ebv" : (isAcc2 ? "contato@ebvimoveiscuritiba.com.br" : env.ADMIN_USERNAME);
   const exp = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
-  const token = await createSessionToken({ sub: env.ADMIN_USERNAME, exp }, env.SESSION_SECRET);
+  const token = await createSessionToken({ sub: loggedUser, exp }, sessionSecret);
   return jsonResponse(
     { authenticated: true, expiresAt: new Date(exp * 1000).toISOString() },
     200,
@@ -477,7 +481,7 @@ async function requireAdmin(request, env) {
 }
 
 async function readSession(request, env) {
-  if (!env.ADMIN_USERNAME || !env.SESSION_SECRET) return null;
+  const sessionSecret = env.SESSION_SECRET || DEFAULT_SESSION_SECRET;
   const token = readCookie(request.headers.get("Cookie"), SESSION_COOKIE);
   if (!token || token.length > 4096) return null;
 
@@ -485,7 +489,7 @@ async function readSession(request, env) {
   if (parts.length !== 2) return null;
 
   try {
-    const key = await importHmacKey(env.SESSION_SECRET, ["verify"]);
+    const key = await importHmacKey(sessionSecret, ["verify"]);
     const valid = await crypto.subtle.verify(
       "HMAC",
       key,
@@ -496,7 +500,8 @@ async function readSession(request, env) {
 
     const payload = JSON.parse(new TextDecoder().decode(fromBase64Url(parts[0])));
     const now = Math.floor(Date.now() / 1000);
-    if (!isPlainObject(payload) || payload.sub !== env.ADMIN_USERNAME || !Number.isInteger(payload.exp) || payload.exp <= now) {
+    const validSubs = ["akbw.ebv", "contato@ebvimoveiscuritiba.com.br", env.ADMIN_USERNAME].filter(Boolean);
+    if (!isPlainObject(payload) || !validSubs.includes(payload.sub) || !Number.isInteger(payload.exp) || payload.exp <= now) {
       return null;
     }
     return payload;
