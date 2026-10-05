@@ -1215,10 +1215,21 @@ function renderAdminPhotoGallery() {
 
     // Desktop HTML5 Drag and Drop Events
     card.addEventListener("dragstart", (e) => {
+      if (e.target.closest("button")) {
+        e.preventDefault();
+        return;
+      }
       draggedPhotoIndex = idx;
       card.classList.add("dragging");
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", idx.toString());
+    });
+
+    card.addEventListener("dragenter", (e) => {
+      e.preventDefault();
+      if (draggedPhotoIndex !== null && draggedPhotoIndex !== idx) {
+        card.classList.add("drag-over");
+      }
     });
 
     card.addEventListener("dragover", (e) => {
@@ -1309,8 +1320,52 @@ function renderAdminPhotoGallery() {
       gridEl.querySelectorAll(".admin-photo-card").forEach(c => c.classList.remove("drag-over", "dragging"));
     });
 
+    // Quick Reorder Controls (Previous / Next position)
+    const controls = document.createElement("div");
+    controls.className = "admin-photo-controls";
+
+    if (idx > 0) {
+      const prevBtn = document.createElement("button");
+      prevBtn.type = "button";
+      prevBtn.className = "admin-photo-nav-btn";
+      prevBtn.innerHTML = "◀";
+      prevBtn.title = "Mover para antes (posição " + idx + ")";
+      prevBtn.onclick = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        movePhotoInForm(idx, idx - 1);
+      };
+      controls.appendChild(prevBtn);
+    }
+
+    if (idx < currentFormImages.length - 1) {
+      const nextBtn = document.createElement("button");
+      nextBtn.type = "button";
+      nextBtn.className = "admin-photo-nav-btn";
+      nextBtn.innerHTML = "▶";
+      nextBtn.title = "Mover para depois (posição " + (idx + 2) + ")";
+      nextBtn.onclick = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        movePhotoInForm(idx, idx + 1);
+      };
+      controls.appendChild(nextBtn);
+    }
+
+    card.appendChild(controls);
     gridEl.appendChild(card);
   });
+}
+
+// Move Photo to a New Position in the List
+function movePhotoInForm(fromIndex, toIndex) {
+  if (fromIndex < 0 || fromIndex >= currentFormImages.length) return;
+  if (toIndex < 0 || toIndex >= currentFormImages.length) return;
+  if (fromIndex === toIndex) return;
+
+  const moved = currentFormImages.splice(fromIndex, 1)[0];
+  currentFormImages.splice(toIndex, 0, moved);
+  renderAdminPhotoGallery();
 }
 
 // Remove Individual Photo from Form List
