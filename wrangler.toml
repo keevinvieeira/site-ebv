@@ -1,14 +1,15 @@
-name = "ebv-imoveis"
+name = "site-ebv"
 account_id = "e40e7bc045d3d2b376418903b4492280"
 main = "src/worker.js"
 compatibility_date = "2026-08-14"
 workers_dev = true
 preview_urls = false
 
-routes = [
-  { pattern = "ebvimoveiscuritiba.com.br/*", zone_name = "ebvimoveiscuritiba.com.br" },
-  { pattern = "www.ebvimoveiscuritiba.com.br/*", zone_name = "ebvimoveiscuritiba.com.br" }
-]
+# As rotas de domínio personalizado são gerenciadas no painel da Cloudflare (Workers > site-ebv > Settings > Domains & Routes)
+# routes = [
+#   { pattern = "ebvimoveiscuritiba.com.br/*", zone_name = "ebvimoveiscuritiba.com.br" },
+#   { pattern = "www.ebvimoveiscuritiba.com.br/*", zone_name = "ebvimoveiscuritiba.com.br" }
+# ]
 
 # Create and configure the resources before deploying:
 #   npx wrangler d1 create ebv-imoveis
