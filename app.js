@@ -124,6 +124,7 @@ const DEFAULT_PROPERTIES = [
 let properties = [];
 let appraisals = [];
 let targetNavigatePage = null; // Temp storage for navigation when locked
+let adminAuthenticated = false;
 
 // Modal Photo Gallery & Admin Form State
 let currentModalImages = [];
@@ -131,10 +132,12 @@ let currentModalPhotoIndex = 0;
 let activeModalPropertyId = null; // Global tracker for currently viewed property
 let editingPropertyId = null;     // Global tracker for currently edited property
 let currentFormImages = [];       // Dynamic images list for admin property form
+const DEFAULT_PAGE_TITLE = document.title;
 
 // Initialize Application
 document.addEventListener("DOMContentLoaded", async () => {
   await loadStateAsync();
+  await restoreAdminSession();
   renderFeaturedProperties();
   renderCatalogProperties();
   populateSearchFilters();
@@ -142,6 +145,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateAdminDashboard();
   setupScrollEffects();
   renderAdminPhotoGallery();
+  handleLocationRoute();
   
   // Close fullscreen viewer when clicking overlay background
   const fViewer = document.getElementById("fullscreen-viewer");
@@ -193,6 +197,17 @@ function openDB() {
 
 async function loadStateAsync() {
   try {
+    const remoteProperties = await apiRequest("/api/properties");
+    if (Array.isArray(remoteProperties) && remoteProperties.length > 0) {
+      properties = remoteProperties;
+      await saveLocalStateAsync();
+      return;
+    }
+  } catch (err) {
+    console.warn("API load warning; using local catalog:", err);
+  }
+
+  try {
     const db = await openDB();
     if (db) {
       const tx = db.transaction(["properties", "appraisals"], "readonly");
@@ -240,6 +255,12 @@ async function loadStateAsync() {
 }
 
 async function saveStateAsync() {
+  await saveLocalStateAsync();
+  populateSearchFilters();
+  updateAdminDashboard();
+}
+
+async function saveLocalStateAsync() {
   try {
     const db = await openDB();
     if (db) {
@@ -258,17 +279,51 @@ async function saveStateAsync() {
     console.warn("LocalStorage quota exceeded (safely stored in IndexedDB):", quotaErr);
   }
 
-  populateSearchFilters();
-  updateAdminDashboard();
 }
 
 function saveState() {
   saveStateAsync();
 }
 
+async function apiRequest(path, options = {}) {
+  const response = await fetch(path, {
+    credentials: "same-origin",
+    ...options,
+    headers: {
+      ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+      ...(options.headers || {})
+    }
+  });
+
+  const payload = response.status === 204 ? null : await response.json().catch(() => null);
+  if (!response.ok) {
+    const error = new Error(payload?.error?.message || "Não foi possível comunicar com o servidor.");
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
+async function restoreAdminSession() {
+  try {
+    const session = await apiRequest("/api/admin/session", { method: "GET" });
+    adminAuthenticated = session.authenticated === true;
+    if (adminAuthenticated) await loadAdminAppraisals();
+  } catch {
+    adminAuthenticated = false;
+  }
+  return adminAuthenticated;
+}
+
+async function loadAdminAppraisals() {
+  if (!adminAuthenticated) return;
+  appraisals = await apiRequest("/api/admin/appraisals", { method: "GET" });
+  updateAdminDashboard();
+}
+
 // Security & Authentication for Admin Panel
 function checkLogin() {
-  return sessionStorage.getItem("ebv_logged") === "true";
+  return adminAuthenticated;
 }
 
 // LGPD Consent Banner Logic
@@ -278,7 +333,7 @@ function checkLgpdConsent() {
   const banner = document.getElementById("lgpd-banner");
   if (!consent && !rejected && banner) {
     setTimeout(() => {
-      banner.style.bottom = "20px";
+      banner.classList.add("is-visible");
     }, 1500); // Premium delay slide-in
   }
 }
@@ -286,13 +341,13 @@ function checkLgpdConsent() {
 function acceptLgpdConsent() {
   localStorage.setItem("ebv_lgpd_consent", "true");
   const banner = document.getElementById("lgpd-banner");
-  if (banner) banner.style.bottom = "-250px";
+  if (banner) banner.classList.remove("is-visible");
 }
 
 function rejectLgpdConsent() {
   sessionStorage.setItem("ebv_lgpd_rejected", "true");
   const banner = document.getElementById("lgpd-banner");
-  if (banner) banner.style.bottom = "-250px";
+  if (banner) banner.classList.remove("is-visible");
 }
 
 function openLoginModal(pageId) {
@@ -308,37 +363,51 @@ function closeLoginModal() {
   document.getElementById("login-form").reset();
 }
 
-function submitLogin(event) {
+async function submitLogin(event) {
   event.preventDefault();
   const user = document.getElementById("login-username").value.trim();
   const pass = document.getElementById("login-password").value;
   const errorAlert = document.getElementById("login-error");
 
-  // Validate credentials based on LOGIN.txt
-  const validUser1 = "akbw.ebv";
-  const validPass1 = "Ak123!@#";
-  const validUser2 = "contato@ebvimoveiscuritiba.com.br";
-  const validPass2 = "Ebv0502!";
-
-  if ((user === validUser1 && pass === validPass1) || (user === validUser2 && pass === validPass2)) {
-    sessionStorage.setItem("ebv_logged", "true");
+  try {
+    await apiRequest("/api/login", {
+      method: "POST",
+      body: JSON.stringify({ username: user, password: pass })
+    });
+    adminAuthenticated = true;
+    await loadAdminAppraisals();
     closeLoginModal();
     if (targetNavigatePage) {
       navigateTo(targetNavigatePage);
     }
-  } else {
+  } catch (err) {
+    console.warn("Login failed:", err);
     errorAlert.style.display = "block";
   }
 }
 
-function handleLogout() {
-  sessionStorage.removeItem("ebv_logged");
+async function handleLogout() {
+  try {
+    await apiRequest("/api/logout", { method: "POST", body: "{}" });
+  } catch (err) {
+    console.warn("Logout warning:", err);
+  }
+  adminAuthenticated = false;
+  appraisals = [];
   navigateTo("home");
   alert("Sessão encerrada com sucesso.");
 }
 
 // Router & Tabs navigation
-function navigateTo(pageId) {
+async function navigateTo(pageId) {
+  if (pageId === "admin" && !checkLogin()) {
+    await restoreAdminSession();
+  }
+
+  if (window.location.pathname.startsWith("/imovel/")) {
+    hidePropertyDetails();
+    history.pushState({}, "", `/#${pageId}`);
+  }
   if (pageId === "admin" && !checkLogin()) {
     openLoginModal(pageId);
     return;
@@ -411,18 +480,18 @@ function renderFeaturedProperties() {
 function createPropertyCard(prop) {
   const card = document.createElement("div");
   card.className = "property-card";
-  const safeId = escapeHTML(prop.id);
   const safeTitle = escapeHTML(prop.title);
   const safeLocation = escapeHTML(prop.location);
   const safeType = escapeHTML(capitalize(prop.type));
   const safeImage = escapeHTML(prop.image);
+  const safeUrl = escapeHTML(propertyUrl(prop));
 
   card.innerHTML = `
-    <div class="property-img-wrapper" style="cursor: pointer;" onclick="openPropertyModal('${safeId}')" title="Clique para ver detalhes do imóvel">
+    <a class="property-img-wrapper property-detail-link" href="${safeUrl}" data-property-link title="Ver página deste imóvel">
       <img src="${safeImage}" alt="${safeTitle}" class="property-img" onerror="this.src='assets/sobrado_real.jpg'">
       <span class="property-badge-status">Comprar</span>
       <span class="property-badge-type">${safeType}</span>
-    </div>
+    </a>
     <div class="property-info">
       <div class="property-location">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
@@ -444,10 +513,28 @@ function createPropertyCard(prop) {
           <span>${Number(prop.baths) || 0} Banheiros/WC</span>
         </div>
       </div>
-      <button class="btn-primary" style="margin-top: 20px; width: 100%; justify-content: center;" onclick="openPropertyModal('${safeId}')">Ver Detalhes</button>
+      <a class="btn-primary" href="${safeUrl}" data-property-link style="margin-top: 20px; width: 100%; justify-content: center;">Ver página do imóvel</a>
     </div>
   `;
+
+  card.querySelectorAll("[data-property-link]").forEach(link => {
+    link.addEventListener("click", event => openPropertyPage(event, prop.id));
+  });
   return card;
+}
+
+function slugify(value) {
+  return String(value || "imovel")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "imovel";
+}
+
+function propertyUrl(prop) {
+  return `/imovel/${encodeURIComponent(prop.id)}/${slugify(prop.title)}`;
 }
 
 // Capitalize helper
@@ -597,14 +684,62 @@ function renderCatalogProperties(searchParams = null) {
 }
 
 // Property Gallery Handlers
-function openPropertyModal(id) {
+function openPropertyPage(event, id) {
+  if (event) event.preventDefault();
+  const prop = properties.find(item => item.id === id);
+  if (!prop) return;
+
+  history.pushState({ propertyId: id }, "", propertyUrl(prop));
+  openPropertyModal(id, true);
+}
+
+function propertyIdFromPath() {
+  const match = window.location.pathname.match(/^\/imovel\/([^/]+)(?:\/[^/]*)?\/?$/);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+function handleLocationRoute() {
+  const propertyId = propertyIdFromPath();
+  if (propertyId) {
+    const prop = properties.find(item => item.id === propertyId);
+    if (prop) {
+      const canonicalPath = propertyUrl(prop);
+      if (window.location.pathname !== canonicalPath) {
+        history.replaceState({ propertyId }, "", canonicalPath + window.location.search);
+      }
+      openPropertyModal(propertyId, true);
+      return;
+    }
+    history.replaceState({}, "", "/#imoveis");
+    navigateTo("imoveis");
+    return;
+  }
+
+  hidePropertyDetails();
+  const pageId = window.location.hash.slice(1);
+  if (["home", "imoveis", "avaliacao", "sobre", "termos", "privacidade"].includes(pageId)) {
+    navigateTo(pageId);
+  }
+}
+
+window.addEventListener("popstate", handleLocationRoute);
+
+function openPropertyModal(id, standalone = false) {
   const prop = properties.find(p => p.id === id);
   if (!prop) return;
 
   // Track global property modal view
   activeModalPropertyId = id;
   prop.views = (prop.views || 0) + 1;
-  saveState();
+  apiRequest(`/api/properties/${encodeURIComponent(id)}/view`, {
+    method: "POST",
+    body: "{}"
+  }).catch(err => console.warn("View metric warning:", err));
 
   // Load photos state
   currentModalImages = prop.images || [prop.image || "assets/sobrado_real.jpg"];
@@ -665,14 +800,44 @@ function openPropertyModal(id) {
 
   // Open Modal
   const modal = document.getElementById("property-modal");
+  modal.classList.toggle("property-page", standalone);
   modal.style.display = "flex";
-  document.body.style.overflow = "hidden";
+  document.body.classList.toggle("property-page-open", standalone);
+  document.body.style.overflow = standalone ? "auto" : "hidden";
+
+  if (standalone) {
+    document.title = `${prop.title} | EBV Imóveis`;
+    const descriptionMeta = document.querySelector('meta[name="description"]');
+    if (descriptionMeta) {
+      descriptionMeta.dataset.defaultContent ||= descriptionMeta.content;
+      descriptionMeta.content = String(prop.desc || "").replace(/\s+/g, " ").trim().slice(0, 160);
+    }
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }
 }
 
 function closePropertyModal() {
   const modal = document.getElementById("property-modal");
+  if (modal.classList.contains("property-page")) {
+    history.pushState({}, "", "/#imoveis");
+    hidePropertyDetails();
+    navigateTo("imoveis");
+    return;
+  }
+  hidePropertyDetails();
+}
+
+function hidePropertyDetails() {
+  const modal = document.getElementById("property-modal");
   modal.style.display = "none";
+  modal.classList.remove("property-page");
+  document.body.classList.remove("property-page-open");
   document.body.style.overflow = "auto";
+  document.title = DEFAULT_PAGE_TITLE;
+  const descriptionMeta = document.querySelector('meta[name="description"]');
+  if (descriptionMeta?.dataset.defaultContent) {
+    descriptionMeta.content = descriptionMeta.dataset.defaultContent;
+  }
 }
 
 function selectModalPhoto(index) {
@@ -764,14 +929,17 @@ function trackWaClick() {
   const prop = properties.find(p => p.id === activeModalPropertyId);
   if (prop) {
     prop.waClicks = (prop.waClicks || 0) + 1;
-    saveState();
+    apiRequest(`/api/properties/${encodeURIComponent(prop.id)}/whatsapp`, {
+      method: "POST",
+      body: "{}"
+    }).catch(err => console.warn("WhatsApp metric warning:", err));
   }
 }
 
 // Close modal on overlay click
 window.addEventListener("click", (e) => {
   const modal = document.getElementById("property-modal");
-  if (e.target === modal) {
+  if (e.target === modal && !modal.classList.contains("property-page")) {
     closePropertyModal();
   }
   const loginModal = document.getElementById("login-modal");
@@ -781,7 +949,7 @@ window.addEventListener("click", (e) => {
 });
 
 // Submit Appraisal Request (Client)
-function submitAppraisal(event) {
+async function submitAppraisal(event) {
   event.preventDefault();
 
   const name = document.getElementById("ap-name").value;
@@ -793,23 +961,33 @@ function submitAppraisal(event) {
   const details = document.getElementById("ap-details").value || "-";
 
   const newRequest = {
-    id: "req-" + Date.now(),
     name,
     phone,
     email,
     type,
     area,
     location,
-    details,
-    date: new Date().toLocaleDateString("pt-BR")
+    details
   };
 
-  appraisals.push(newRequest);
-  saveState();
+  const submitBtn = event.submitter;
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    await apiRequest("/api/appraisals", {
+      method: "POST",
+      body: JSON.stringify(newRequest)
+    });
+  } catch (err) {
+    alert("Não foi possível enviar a solicitação. Verifique sua conexão e tente novamente.");
+    if (submitBtn) submitBtn.disabled = false;
+    return;
+  }
 
   const successAlert = document.getElementById("appraisal-success");
   successAlert.style.display = "flex";
   document.getElementById("appraisal-form").reset();
+  if (submitBtn) submitBtn.disabled = false;
 
   setTimeout(() => {
     successAlert.style.display = "none";
@@ -869,6 +1047,74 @@ function compressImageFile(file, maxWidth = 1200, quality = 0.75) {
   });
 }
 
+async function uploadPendingImages(images) {
+  const uploaded = [];
+  const pendingCount = images.filter(src => src.startsWith("data:")).length;
+  let completed = 0;
+  const progressContainer = document.getElementById("admin-photo-progress");
+  const progressText = document.getElementById("admin-photo-progress-text");
+  const progressBar = document.getElementById("admin-photo-progress-bar");
+
+  if (pendingCount > 0 && progressContainer) progressContainer.style.display = "block";
+
+  for (const image of images) {
+    if (!image.startsWith("data:")) {
+      uploaded.push(image);
+      continue;
+    }
+
+    const blob = dataUrlToBlob(image);
+    const form = new FormData();
+    form.append("file", blob, `foto-${Date.now()}-${completed + 1}.jpg`);
+    const result = await apiRequest("/api/admin/images", { method: "POST", body: form });
+    uploaded.push(result.url);
+    completed += 1;
+
+    const pct = Math.round((completed / pendingCount) * 100);
+    if (progressText) progressText.textContent = `Enviando foto ${completed} de ${pendingCount}... (${pct}%)`;
+    if (progressBar) progressBar.style.width = `${pct}%`;
+  }
+
+  return uploaded;
+}
+
+function dataUrlToBlob(dataUrl) {
+  const separator = dataUrl.indexOf(",");
+  if (separator === -1) throw new Error("Formato de imagem local inválido.");
+
+  const metadata = dataUrl.slice(0, separator);
+  const mimeMatch = metadata.match(/^data:([^;]+)/);
+  const binary = metadata.includes(";base64")
+    ? atob(dataUrl.slice(separator + 1))
+    : decodeURIComponent(dataUrl.slice(separator + 1));
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new Blob([bytes], { type: mimeMatch?.[1] || "image/jpeg" });
+}
+
+async function saveCatalogRemote() {
+  const migratedProperties = [];
+  for (const property of properties) {
+    const sourceImages = property.images?.length ? property.images : [property.image].filter(Boolean);
+    const images = await uploadPendingImages(sourceImages);
+    migratedProperties.push({ ...property, image: images[0] || "", images });
+  }
+
+  await apiRequest("/api/admin/properties", {
+    method: "PUT",
+    body: JSON.stringify({ properties: migratedProperties })
+  });
+
+  properties = migratedProperties;
+  await saveLocalStateAsync();
+  populateSearchFilters();
+  updateAdminDashboard();
+}
+
 // Handle Batch Photo Upload (Supports 50+ photos with live progress indicator)
 async function handleBatchPhotoUpload(event) {
   const files = Array.from(event.target.files);
@@ -906,7 +1152,9 @@ async function handleBatchPhotoUpload(event) {
   renderAdminPhotoGallery();
 }
 
-// Render Admin Photo Gallery Preview Grid with Individual "X" Delete Buttons
+// Render Admin Photo Gallery Preview Grid with Drag & Drop Reordering and "X" Delete Buttons
+let draggedPhotoIndex = null;
+
 function renderAdminPhotoGallery() {
   const countEl = document.getElementById("admin-photo-count");
   const gridEl = document.getElementById("admin-photo-grid");
@@ -928,12 +1176,23 @@ function renderAdminPhotoGallery() {
   currentFormImages.forEach((imgSrc, idx) => {
     const card = document.createElement("div");
     card.className = "admin-photo-card";
+    card.draggable = true;
+    card.dataset.index = idx;
+    card.title = "Segure e arraste para ordenar a sequência das fotos";
 
     const img = document.createElement("img");
     img.src = imgSrc;
     img.alt = `Foto ${idx + 1}`;
     img.loading = "lazy";
+    img.draggable = false; // Prevent native image ghost drag
 
+    // Drag handle icon
+    const dragHandle = document.createElement("div");
+    dragHandle.className = "admin-photo-drag-handle";
+    dragHandle.innerHTML = "⋮⋮";
+    dragHandle.title = "Segure e arraste";
+
+    // Delete button
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
     removeBtn.className = "admin-photo-remove-btn";
@@ -944,15 +1203,111 @@ function renderAdminPhotoGallery() {
       removePhotoFromForm(idx);
     };
 
-    card.appendChild(img);
-    card.appendChild(removeBtn);
+    // Sequential Position & Cover Badge
+    const badge = document.createElement("span");
+    badge.className = "admin-photo-badge" + (idx === 0 ? " is-cover" : "");
+    badge.textContent = idx === 0 ? "1 • Capa" : `${idx + 1}`;
 
-    if (idx === 0) {
-      const badge = document.createElement("span");
-      badge.className = "admin-photo-badge";
-      badge.textContent = "Capa";
-      card.appendChild(badge);
-    }
+    card.appendChild(img);
+    card.appendChild(dragHandle);
+    card.appendChild(removeBtn);
+    card.appendChild(badge);
+
+    // Desktop HTML5 Drag and Drop Events
+    card.addEventListener("dragstart", (e) => {
+      draggedPhotoIndex = idx;
+      card.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", idx.toString());
+    });
+
+    card.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (!card.classList.contains("dragging")) {
+        card.classList.add("drag-over");
+      }
+    });
+
+    card.addEventListener("dragleave", () => {
+      card.classList.remove("drag-over");
+    });
+
+    card.addEventListener("drop", (e) => {
+      e.preventDefault();
+      card.classList.remove("drag-over");
+      const fromIdx = draggedPhotoIndex !== null ? draggedPhotoIndex : parseInt(e.dataTransfer.getData("text/plain"), 10);
+      const toIdx = idx;
+
+      if (!isNaN(fromIdx) && fromIdx !== toIdx && fromIdx >= 0 && fromIdx < currentFormImages.length) {
+        const movedItem = currentFormImages.splice(fromIdx, 1)[0];
+        currentFormImages.splice(toIdx, 0, movedItem);
+        renderAdminPhotoGallery();
+      }
+      draggedPhotoIndex = null;
+    });
+
+    card.addEventListener("dragend", () => {
+      card.classList.remove("dragging");
+      draggedPhotoIndex = null;
+      gridEl.querySelectorAll(".admin-photo-card").forEach(c => c.classList.remove("drag-over", "dragging"));
+    });
+
+    // Touch Support for Mobile / Tablet Drag & Drop
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let isTouchDragging = false;
+
+    card.addEventListener("touchstart", (e) => {
+      if (e.target.closest(".admin-photo-remove-btn")) return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      draggedPhotoIndex = idx;
+    }, { passive: true });
+
+    card.addEventListener("touchmove", (e) => {
+      if (draggedPhotoIndex === null) return;
+      const touchX = e.touches[0].clientX;
+      const touchY = e.touches[0].clientY;
+      const dist = Math.hypot(touchX - touchStartX, touchY - touchStartY);
+
+      if (dist > 12 && !isTouchDragging) {
+        isTouchDragging = true;
+        card.classList.add("dragging");
+      }
+
+      if (isTouchDragging) {
+        if (e.cancelable) e.preventDefault();
+        const elemBelow = document.elementFromPoint(touchX, touchY);
+        const targetCard = elemBelow ? elemBelow.closest(".admin-photo-card") : null;
+        gridEl.querySelectorAll(".admin-photo-card").forEach(c => c.classList.remove("drag-over"));
+        if (targetCard && targetCard !== card) {
+          targetCard.classList.add("drag-over");
+        }
+      }
+    }, { passive: false });
+
+    card.addEventListener("touchend", (e) => {
+      if (isTouchDragging && draggedPhotoIndex !== null) {
+        const touch = e.changedTouches[0];
+        const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+        const targetCard = elemBelow ? elemBelow.closest(".admin-photo-card") : null;
+
+        if (targetCard && targetCard.dataset.index !== undefined) {
+          const fromIdx = draggedPhotoIndex;
+          const toIdx = parseInt(targetCard.dataset.index, 10);
+          if (!isNaN(toIdx) && fromIdx !== toIdx && fromIdx >= 0 && fromIdx < currentFormImages.length) {
+            const movedItem = currentFormImages.splice(fromIdx, 1)[0];
+            currentFormImages.splice(toIdx, 0, movedItem);
+            renderAdminPhotoGallery();
+          }
+        }
+      }
+      isTouchDragging = false;
+      draggedPhotoIndex = null;
+      card.classList.remove("dragging");
+      gridEl.querySelectorAll(".admin-photo-card").forEach(c => c.classList.remove("drag-over", "dragging"));
+    });
 
     gridEl.appendChild(card);
   });
@@ -994,10 +1349,12 @@ function editProperty(id) {
   document.getElementById("admin-form-submit-btn").textContent = "Salvar Alterações";
   document.getElementById("admin-form-cancel-btn").style.display = "inline-block";
 
-  // Smooth scroll to the form card
-  const formCard = document.querySelector(".form-card");
+  // Scroll to the property form rather than the first form card on the page.
+  const formCard = document.getElementById("new-property-form")?.closest(".form-card");
   if (formCard) {
-    formCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    formCard.classList.add("editing-property");
+    const top = formCard.getBoundingClientRect().top + window.scrollY - 100;
+    window.scrollTo({ top, behavior: "smooth" });
   }
 }
 
@@ -1008,6 +1365,7 @@ function cancelEditProperty() {
 
   // Reset form
   document.getElementById("new-property-form").reset();
+  document.getElementById("new-property-form")?.closest(".form-card")?.classList.remove("editing-property");
   renderAdminPhotoGallery();
 
   // Restore dynamic UI elements
@@ -1027,6 +1385,10 @@ async function saveNewProperty(event) {
 
   const submitBtn = document.getElementById("admin-form-submit-btn");
   const origBtnText = submitBtn ? submitBtn.textContent : "Salvar";
+  const previousProperties = properties.map(property => ({
+    ...property,
+    images: property.images ? [...property.images] : []
+  }));
 
   if (submitBtn) {
     submitBtn.disabled = true;
@@ -1034,6 +1396,8 @@ async function saveNewProperty(event) {
   }
 
   try {
+    if (!adminAuthenticated) throw new Error("Sua sessão expirou. Entre novamente no painel.");
+
     const title = document.getElementById("prop-title").value;
     const status = "venda";
     const type = document.getElementById("prop-type").value;
@@ -1068,7 +1432,7 @@ async function saveNewProperty(event) {
           images: [...currentFormImages]
         };
 
-        await saveStateAsync();
+        await saveCatalogRemote();
         cancelEditProperty();
         renderFeaturedProperties();
         renderCatalogProperties();
@@ -1095,7 +1459,7 @@ async function saveNewProperty(event) {
       };
 
       properties.unshift(newProperty);
-      await saveStateAsync();
+      await saveCatalogRemote();
 
       cancelEditProperty();
       renderFeaturedProperties();
@@ -1104,6 +1468,7 @@ async function saveNewProperty(event) {
       alert("Novo imóvel cadastrado com sucesso e adicionado ao catálogo!");
     }
   } catch (err) {
+    properties = previousProperties;
     console.error("Erro ao salvar imóvel:", err);
     alert("Ocorreu um erro ao salvar o imóvel: " + err.message);
   } finally {
@@ -1115,21 +1480,32 @@ async function saveNewProperty(event) {
 }
 
 // Delete Property via Admin Panel
-function deleteProperty(id) {
+async function deleteProperty(id) {
   if (confirm("Tem certeza de que deseja excluir este imóvel do catálogo?")) {
+    const previousProperties = properties;
     properties = properties.filter(p => p.id !== id);
-    saveState();
-    renderFeaturedProperties();
-    renderCatalogProperties();
-    updateAdminDashboard();
+    try {
+      await saveCatalogRemote();
+      renderFeaturedProperties();
+      renderCatalogProperties();
+      updateAdminDashboard();
+    } catch (err) {
+      properties = previousProperties;
+      alert("Não foi possível excluir o imóvel: " + err.message);
+    }
   }
 }
 
 // Delete Appraisal Request via Admin Panel
-function deleteAppraisal(id) {
+async function deleteAppraisal(id) {
   if (confirm("Tem certeza de que deseja excluir este pedido de avaliação?")) {
-    appraisals = appraisals.filter(a => a.id !== id);
-    saveState();
+    try {
+      await apiRequest(`/api/admin/appraisals/${encodeURIComponent(id)}`, { method: "DELETE" });
+      appraisals = appraisals.filter(a => a.id !== id);
+      updateAdminDashboard();
+    } catch (err) {
+      alert("Não foi possível excluir o pedido: " + err.message);
+    }
   }
 }
 

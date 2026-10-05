@@ -7,3 +7,7 @@
 *.log
 .DS_Store
 Thumbs.db
+
+# Cloudflare and Node.js local state
+.wrangler/
+node_modules/

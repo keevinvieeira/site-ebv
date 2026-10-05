@@ -1,0 +1,38 @@
+name = "ebv-imoveis"
+account_id = "e40e7bc045d3d2b376418903b4492280"
+main = "src/worker.js"
+compatibility_date = "2026-08-14"
+workers_dev = true
+preview_urls = false
+
+routes = [
+  { pattern = "ebvimoveiscuritiba.com.br/*", zone_name = "ebvimoveiscuritiba.com.br" },
+  { pattern = "www.ebvimoveiscuritiba.com.br/*", zone_name = "ebvimoveiscuritiba.com.br" }
+]
+
+# Create and configure the resources before deploying:
+#   npx wrangler d1 create ebv-imoveis
+#   npx wrangler r2 bucket create ebv-imoveis-photos
+# Replace database_id below with the ID printed by the first command.
+# Configure runtime values without committing credentials:
+#   npx wrangler secret put ADMIN_PASSWORD
+#   npx wrangler secret put SESSION_SECRET
+
+[vars]
+ADMIN_USERNAME = "contato@ebvimoveiscuritiba.com.br"
+
+[assets]
+directory = "."
+binding = "ASSETS"
+run_worker_first = ["/api/*", "/media/*", "/imovel/*"]
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ebv-imoveis"
+database_id = "ac8e6c10-c9eb-4072-8e41-f9431781dffe"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "ebv-imoveis-photos"
