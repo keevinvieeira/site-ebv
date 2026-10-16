@@ -26,6 +26,7 @@ preview_urls = false
 
 [vars]
 ADMIN_USERNAME = "contato@ebvimoveiscuritiba.com.br"
+META_PIXEL_ID = "1430221655110940"  # Conjunto de dados "EBV Imóveis - Site" (portfólio EBV Imóveis)
 
 [assets]
 directory = "."
