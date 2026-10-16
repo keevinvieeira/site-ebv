@@ -230,7 +230,7 @@ function escapeAttribute(value) {
 
 // Credenciais vêm só de secrets do Cloudflare (nunca do código):
 //   ADMIN_USERNAME / ADMIN_PASSWORD (obrigatório) e ADMIN2_USERNAME / ADMIN2_PASSWORD (opcional)
-//   SESSION_SECRET (obrigatório, string aleatória longa)
+//   SESSION_SECRET (opcional; sem ele a chave é gerada e guardada no D1)
 function adminAccounts(env) {
   return [
     [env.ADMIN_USERNAME, env.ADMIN_PASSWORD],
@@ -238,12 +238,24 @@ function adminAccounts(env) {
   ].filter(([u, p]) => typeof u === "string" && u && typeof p === "string" && p.length >= 8);
 }
 
-function sessionSecretOf(env) {
-  return typeof env.SESSION_SECRET === "string" && env.SESSION_SECRET.length >= 32 ? env.SESSION_SECRET : null;
+// Chave de assinatura da sessão: usa SESSION_SECRET se existir; senão gera uma
+// aleatória e guarda no D1 (ninguém precisa criar nem digitar essa chave).
+let cachedSessionSecret = null;
+async function sessionSecretOf(env) {
+  if (typeof env.SESSION_SECRET === "string" && env.SESSION_SECRET.length >= 32) return env.SESSION_SECRET;
+  if (cachedSessionSecret) return cachedSessionSecret;
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)",
+  ).run();
+  const random = toBase64Url(crypto.getRandomValues(new Uint8Array(48)));
+  await env.DB.prepare("INSERT OR IGNORE INTO app_settings (key, value) VALUES ('session_secret', ?)").bind(random).run();
+  const row = await env.DB.prepare("SELECT value FROM app_settings WHERE key = 'session_secret'").first();
+  cachedSessionSecret = row ? row.value : null;
+  return cachedSessionSecret;
 }
 
 async function login(request, env) {
-  const sessionSecret = sessionSecretOf(env);
+  const sessionSecret = await sessionSecretOf(env);
   const accounts = adminAccounts(env);
   if (!sessionSecret || accounts.length === 0) {
     return jsonError(503, "admin_not_configured", "Painel sem credenciais configuradas no servidor.");
@@ -540,7 +552,7 @@ async function requireAdmin(request, env) {
 }
 
 async function readSession(request, env) {
-  const sessionSecret = sessionSecretOf(env);
+  const sessionSecret = await sessionSecretOf(env);
   if (!sessionSecret) return null;
   const token = readCookie(request.headers.get("Cookie"), SESSION_COOKIE);
   if (!token || token.length > 4096) return null;
