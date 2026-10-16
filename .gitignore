@@ -11,3 +11,5 @@ Thumbs.db
 # Cloudflare and Node.js local state
 .wrangler/
 node_modules/
+.dev.vars
+.dev.vars.*

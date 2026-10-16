@@ -1,3 +1,5 @@
+import { postLead, leadFromAppraisal, listLeads, updateLead, deleteLead } from "./leads.js";
+
 const SESSION_COOKIE = "ebv_session";
 const SESSION_TTL_SECONDS = 8 * 60 * 60;
 const MAX_JSON_BYTES = 2 * 1024 * 1024;
@@ -16,13 +18,13 @@ const SECURITY_HEADERS = {
 };
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     try {
       let response;
       if (url.pathname.startsWith("/api/")) {
-        response = await handleApi(request, env, url);
+        response = await handleApi(request, env, url, ctx);
       } else if (url.pathname.startsWith("/media/")) {
         response = await handleMedia(request, env, url);
       } else if (url.pathname.startsWith("/imovel/")) {
@@ -48,7 +50,7 @@ export default {
   },
 };
 
-async function handleApi(request, env, url) {
+async function handleApi(request, env, url, ctx) {
   const { method } = request;
   const path = url.pathname;
 
@@ -77,7 +79,44 @@ async function handleApi(request, env, url) {
 
   if (path === "/api/appraisals") {
     if (method !== "POST") return methodNotAllowed(["POST"]);
-    return createAppraisal(request, env);
+    return createAppraisal(request, env, ctx);
+  }
+
+  if (path === "/api/config") {
+    if (method !== "GET") return methodNotAllowed(["GET"]);
+    return jsonResponse({ metaPixelId: env.META_PIXEL_ID || null });
+  }
+
+  if (path === "/api/leads") {
+    if (method !== "POST") return methodNotAllowed(["POST"]);
+    const parsed = await readJson(request, 16 * 1024);
+    if (parsed.error) return parsed.error;
+    const result = await postLead(request, env, ctx, parsed.value);
+    return jsonResponse(result.body, result.status);
+  }
+
+  if (path === "/api/admin/leads") {
+    if (method !== "GET") return methodNotAllowed(["GET"]);
+    const unauthorized = await requireAdmin(request, env);
+    if (unauthorized) return unauthorized;
+    return jsonResponse(await listLeads(env));
+  }
+
+  const leadMatch = path.match(/^\/api\/admin\/leads\/([^/]+)$/);
+  if (leadMatch) {
+    if (method !== "PATCH" && method !== "DELETE") return methodNotAllowed(["PATCH", "DELETE"]);
+    const unauthorized = await requireAdmin(request, env);
+    if (unauthorized) return unauthorized;
+    const id = decodePathPart(leadMatch[1]);
+    if (!id) return jsonError(400, "invalid_id", "Identificador de lead inválido.");
+    if (method === "DELETE") {
+      const result = await deleteLead(env, id);
+      return jsonResponse(result.body, result.status);
+    }
+    const parsed = await readJson(request, 16 * 1024);
+    if (parsed.error) return parsed.error;
+    const result = await updateLead(request, env, ctx, id, parsed.value);
+    return jsonResponse(result.body, result.status);
   }
 
   const metricMatch = path.match(/^\/api\/properties\/([^/]+)\/(view|whatsapp)$/);
@@ -189,10 +228,26 @@ function escapeAttribute(value) {
   })[character]);
 }
 
-const DEFAULT_SESSION_SECRET = "ebv_imoveis_curitiba_2026_jwt_secret_key_fixed";
+// Credenciais vêm só de secrets do Cloudflare (nunca do código):
+//   ADMIN_USERNAME / ADMIN_PASSWORD (obrigatório) e ADMIN2_USERNAME / ADMIN2_PASSWORD (opcional)
+//   SESSION_SECRET (obrigatório, string aleatória longa)
+function adminAccounts(env) {
+  return [
+    [env.ADMIN_USERNAME, env.ADMIN_PASSWORD],
+    [env.ADMIN2_USERNAME, env.ADMIN2_PASSWORD],
+  ].filter(([u, p]) => typeof u === "string" && u && typeof p === "string" && p.length >= 8);
+}
+
+function sessionSecretOf(env) {
+  return typeof env.SESSION_SECRET === "string" && env.SESSION_SECRET.length >= 32 ? env.SESSION_SECRET : null;
+}
 
 async function login(request, env) {
-  const sessionSecret = env.SESSION_SECRET || DEFAULT_SESSION_SECRET;
+  const sessionSecret = sessionSecretOf(env);
+  const accounts = adminAccounts(env);
+  if (!sessionSecret || accounts.length === 0) {
+    return jsonError(503, "admin_not_configured", "Painel sem credenciais configuradas no servidor.");
+  }
 
   const parsed = await readJson(request, 4096);
   if (parsed.error) return parsed.error;
@@ -203,16 +258,15 @@ async function login(request, env) {
   }
 
   const u = username.trim();
-  const isAcc1 = (await constantTimeEqual(u, "akbw.ebv")) && (await constantTimeEqual(password, "Ak123!@#"));
-  const isAcc2 = (await constantTimeEqual(u, "contato@ebvimoveiscuritiba.com.br")) && (await constantTimeEqual(password, "Ebv0502!"));
-  const isEnvMatch = env.ADMIN_USERNAME && env.ADMIN_PASSWORD &&
-    (await constantTimeEqual(u, env.ADMIN_USERNAME)) && (await constantTimeEqual(password, env.ADMIN_PASSWORD));
-
-  if (!isAcc1 && !isAcc2 && !isEnvMatch) {
-    return jsonError(401, "invalid_credentials", "Usuário ou senha inválidos.");
+  let loggedUser = null;
+  for (const [accUser, accPass] of accounts) {
+    const ok = (await constantTimeEqual(u, accUser)) & (await constantTimeEqual(password, accPass));
+    if (ok && !loggedUser) loggedUser = accUser;
   }
 
-  const loggedUser = isAcc1 ? "akbw.ebv" : (isAcc2 ? "contato@ebvimoveiscuritiba.com.br" : env.ADMIN_USERNAME);
+  if (!loggedUser) {
+    return jsonError(401, "invalid_credentials", "Usuário ou senha inválidos.");
+  }
   const exp = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
   const token = await createSessionToken({ sub: loggedUser, exp }, sessionSecret);
   return jsonResponse(
@@ -230,7 +284,7 @@ async function getProperties(env) {
   return jsonResponse(result.results.map(rowToObject));
 }
 
-async function createAppraisal(request, env) {
+async function createAppraisal(request, env, ctx) {
   const parsed = await readJson(request, 32 * 1024);
   if (parsed.error) return parsed.error;
 
@@ -250,7 +304,14 @@ async function createAppraisal(request, env) {
     "INSERT INTO appraisals (id, data, created_at) VALUES (?, ?, ?)",
   ).bind(id, JSON.stringify(appraisal), createdAt).run();
 
-  return jsonResponse(appraisal, 201);
+  let lead = null;
+  try {
+    lead = await leadFromAppraisal(request, env, ctx, appraisal, parsed.value);
+  } catch (err) {
+    console.error("Lead from appraisal failed", err);
+  }
+
+  return jsonResponse({ ...appraisal, leadRef: lead ? lead.ref : null, eventId: lead ? lead.eventId : null }, 201);
 }
 
 async function incrementMetric(env, id, field) {
@@ -479,7 +540,8 @@ async function requireAdmin(request, env) {
 }
 
 async function readSession(request, env) {
-  const sessionSecret = env.SESSION_SECRET || DEFAULT_SESSION_SECRET;
+  const sessionSecret = sessionSecretOf(env);
+  if (!sessionSecret) return null;
   const token = readCookie(request.headers.get("Cookie"), SESSION_COOKIE);
   if (!token || token.length > 4096) return null;
 
@@ -498,7 +560,7 @@ async function readSession(request, env) {
 
     const payload = JSON.parse(new TextDecoder().decode(fromBase64Url(parts[0])));
     const now = Math.floor(Date.now() / 1000);
-    const validSubs = ["akbw.ebv", "contato@ebvimoveiscuritiba.com.br", env.ADMIN_USERNAME].filter(Boolean);
+    const validSubs = adminAccounts(env).map(([accUser]) => accUser);
     if (!isPlainObject(payload) || !validSubs.includes(payload.sub) || !Number.isInteger(payload.exp) || payload.exp <= now) {
       return null;
     }

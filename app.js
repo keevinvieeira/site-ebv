@@ -133,6 +133,8 @@ let activeModalPropertyId = null; // Global tracker for currently viewed propert
 let editingPropertyId = null;     // Global tracker for currently edited property
 let currentFormImages = [];       // Dynamic images list for admin property form
 const DEFAULT_PAGE_TITLE = document.title;
+let leads = [];
+window.ebvActiveProperty = () => properties.find(p => p.id === activeModalPropertyId) || null;
 
 // Initialize Application
 document.addEventListener("DOMContentLoaded", async () => {
@@ -319,11 +321,140 @@ async function loadAdminAppraisals() {
   if (!adminAuthenticated) return;
   appraisals = await apiRequest("/api/admin/appraisals", { method: "GET" });
   updateAdminDashboard();
+  loadAdminLeads().catch(err => console.warn("Leads load warning:", err));
 }
+
+// ---------- CRM de Leads ----------
+const LEAD_STAGES = [
+  ["novo", "Novo"],
+  ["contatado", "Contatado"],
+  ["qualificado", "Qualificado"],
+  ["visita", "Visita agendada"],
+  ["proposta", "Proposta"],
+  ["fechado", "Fechado"],
+  ["perdido", "Perdido"]
+];
+
+async function loadAdminLeads() {
+  if (!adminAuthenticated) return;
+  leads = await apiRequest("/api/admin/leads", { method: "GET" });
+  renderLeads();
+}
+
+function formatPhoneBR(digits) {
+  const d = String(digits || "").replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return d;
+}
+
+function renderLeads() {
+  const body = document.getElementById("admin-leads-table-body");
+  const count = document.getElementById("leads-count");
+  const filterEl = document.getElementById("leads-filter-stage");
+  if (count) count.textContent = leads.filter(l => l.stage === "novo").length;
+  if (!body) return;
+
+  const filter = filterEl ? filterEl.value : "abertos";
+  const visible = leads.filter(l => {
+    if (filter === "todos") return true;
+    if (filter === "abertos") return l.stage !== "fechado" && l.stage !== "perdido";
+    return l.stage === filter;
+  });
+
+  body.innerHTML = "";
+  if (visible.length === 0) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 6;
+    td.style.textAlign = "center";
+    td.style.color = "var(--text-light)";
+    td.textContent = "Nenhum lead nesta visão.";
+    tr.appendChild(td);
+    body.appendChild(tr);
+    return;
+  }
+
+  visible.forEach(lead => {
+    const tr = document.createElement("tr");
+    const created = new Date(lead.createdAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    const phoneFmt = formatPhoneBR(lead.phone);
+    const waDigits = String(lead.phone || "").replace(/\D/g, "");
+    const waNumber = waDigits.length <= 11 ? `55${waDigits}` : waDigits;
+    const typeLabel = lead.leadType === "proprietario" ? "Proprietário" : "Comprador";
+    const options = LEAD_STAGES.map(([v, l]) => `<option value="${v}"${v === lead.stage ? " selected" : ""}>${l}</option>`).join("");
+
+    tr.innerHTML = `
+      <td><strong>${escapeHTML(lead.name)}</strong><br><small style="color: var(--text-light);">${escapeHTML(created)} · ${escapeHTML(lead.ref)}</small></td>
+      <td><a href="https://wa.me/${escapeHTML(waNumber)}" target="_blank" rel="noopener" data-crm-link style="color: #128C7E; font-weight: 600;">${escapeHTML(phoneFmt)}</a>${lead.email ? `<br><span style="font-size: 0.8rem; color: var(--text-light);">${escapeHTML(lead.email)}</span>` : ""}</td>
+      <td>${escapeHTML(typeLabel)}<br><small style="color: var(--text-light);">${escapeHTML(lead.propertyTitle || "Contato geral")}</small></td>
+      <td><small>${escapeHTML(lead.origin || "Direto")}</small></td>
+      <td><select class="lead-stage-select" data-lead-id="${escapeHTML(lead.id)}" style="padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem;">${options}</select></td>
+      <td style="text-align: center;">
+        <button class="table-action-btn btn-delete" data-lead-delete="${escapeHTML(lead.id)}" title="Excluir lead">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
+      </td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+async function changeLeadStage(id, stage, selectEl) {
+  const lead = leads.find(l => l.id === id);
+  if (!lead) return;
+  const payload = { stage };
+  if (stage === "fechado") {
+    const suggested = lead.value ? String(Math.round(lead.value)) : "";
+    const answer = window.prompt("Valor do negócio fechado (R$, só números). Pode deixar em branco.", suggested);
+    if (answer !== null && answer.trim() !== "") {
+      const n = Number(answer.replace(/\./g, "").replace(",", ".").replace(/[^\d.]/g, ""));
+      if (Number.isFinite(n) && n > 0) payload.value = n;
+    }
+  }
+  selectEl.disabled = true;
+  try {
+    const result = await apiRequest(`/api/admin/leads/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+    lead.stage = result.stage;
+    lead.value = result.value;
+    renderLeads();
+  } catch (err) {
+    alert("Não foi possível atualizar o lead. Tente novamente.");
+    selectEl.value = lead.stage;
+  } finally {
+    selectEl.disabled = false;
+  }
+}
+
+async function deleteLeadAdmin(id) {
+  if (!confirm("Excluir este lead? Essa ação não pode ser desfeita.")) return;
+  try {
+    await apiRequest(`/api/admin/leads/${encodeURIComponent(id)}`, { method: "DELETE" });
+    leads = leads.filter(l => l.id !== id);
+    renderLeads();
+  } catch {
+    alert("Não foi possível excluir o lead.");
+  }
+}
+
+document.addEventListener("change", e => {
+  if (e.target.matches && e.target.matches(".lead-stage-select")) {
+    changeLeadStage(e.target.dataset.leadId, e.target.value, e.target);
+  }
+  if (e.target.id === "leads-filter-stage") renderLeads();
+});
+
+document.addEventListener("click", e => {
+  const del = e.target.closest && e.target.closest("[data-lead-delete]");
+  if (del) deleteLeadAdmin(del.dataset.leadDelete);
+});
 
 // Security & Authentication for Admin Panel
 function checkLogin() {
-  return adminAuthenticated || sessionStorage.getItem("ebv_logged") === "true";
+  return adminAuthenticated;
 }
 
 // LGPD Consent Banner Logic
@@ -369,13 +500,6 @@ async function submitLogin(event) {
   const pass = document.getElementById("login-password").value;
   const errorAlert = document.getElementById("login-error");
 
-  const validUser1 = "akbw.ebv";
-  const validPass1 = "Ak123!@#";
-  const validUser2 = "contato@ebvimoveiscuritiba.com.br";
-  const validPass2 = "Ebv0502!";
-
-  const isValidLocal = (user === validUser1 && pass === validPass1) || (user === validUser2 && pass === validPass2);
-
   try {
     await apiRequest("/api/login", {
       method: "POST",
@@ -390,16 +514,7 @@ async function submitLogin(event) {
     }
   } catch (err) {
     console.warn("API login attempt note:", err);
-    if (isValidLocal) {
-      adminAuthenticated = true;
-      sessionStorage.setItem("ebv_logged", "true");
-      closeLoginModal();
-      if (targetNavigatePage) {
-        navigateTo(targetNavigatePage);
-      }
-    } else {
-      errorAlert.style.display = "block";
-    }
+    errorAlert.style.display = "block";
   }
 }
 
@@ -758,6 +873,7 @@ function openPropertyModal(id, standalone = false) {
     method: "POST",
     body: "{}"
   }).catch(err => console.warn("View metric warning:", err));
+  if (window.EBVTracking) window.EBVTracking.viewContent(prop);
 
   // Load photos state
   currentModalImages = prop.images || [prop.image || "assets/sobrado_real.jpg"];
@@ -978,6 +1094,7 @@ async function submitAppraisal(event) {
   const location = document.getElementById("ap-location").value;
   const details = document.getElementById("ap-details").value || "-";
 
+  const eventId = window.EBVTracking ? window.EBVTracking.newEventId("lead") : undefined;
   const newRequest = {
     name,
     phone,
@@ -985,7 +1102,8 @@ async function submitAppraisal(event) {
     type,
     area,
     location,
-    details
+    details,
+    tracking: window.EBVTracking ? { ...window.EBVTracking.collect(), eventId } : undefined
   };
 
   const submitBtn = event.submitter;
@@ -1000,6 +1118,10 @@ async function submitAppraisal(event) {
     alert("Não foi possível enviar a solicitação. Verifique sua conexão e tente novamente.");
     if (submitBtn) submitBtn.disabled = false;
     return;
+  }
+
+  if (window.EBVTracking) {
+    window.EBVTracking.track("Lead", { lead_type: "proprietario", content_name: `${type} - ${location}`, currency: "BRL" }, eventId);
   }
 
   const successAlert = document.getElementById("appraisal-success");
