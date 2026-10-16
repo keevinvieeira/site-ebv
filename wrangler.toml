@@ -16,8 +16,13 @@ preview_urls = false
 #   npx wrangler r2 bucket create ebv-imoveis-photos
 # Replace database_id below with the ID printed by the first command.
 # Configure runtime values without committing credentials:
-#   npx wrangler secret put ADMIN_PASSWORD
-#   npx wrangler secret put SESSION_SECRET
+#   ADMIN_PASSWORD   (obrigatório, senha do ADMIN_USERNAME)
+#   SESSION_SECRET   (opcional; sem ele a chave de sessão é gerada e guardada no D1)
+#   ADMIN2_USERNAME / ADMIN2_PASSWORD (opcional, segundo acesso ao painel)
+#   META_PIXEL_ID    (ID do conjunto de dados/Pixel da Meta; liga o Pixel no site)
+#   META_CAPI_TOKEN  (token da Conversions API, gerado no Gerenciador de Eventos)
+#   META_TEST_EVENT_CODE (opcional, só para testar eventos no Gerenciador de Eventos)
+# Sem ADMIN_PASSWORD o painel fica bloqueado (não há senha no código).
 
 [vars]
 ADMIN_USERNAME = "contato@ebvimoveiscuritiba.com.br"
