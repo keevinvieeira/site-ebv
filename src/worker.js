@@ -1,4 +1,4 @@
-import { postLead, leadFromAppraisal, listLeads, updateLead, deleteLead } from "./leads.js";
+import { postLead, leadFromAppraisal, listLeads, updateLead, deleteLead, importLeads, audienceCsv } from "./leads.js";
 
 const SESSION_COOKIE = "ebv_session";
 const SESSION_TTL_SECONDS = 8 * 60 * 60;
@@ -93,6 +93,29 @@ async function handleApi(request, env, url, ctx) {
     if (parsed.error) return parsed.error;
     const result = await postLead(request, env, ctx, parsed.value);
     return jsonResponse(result.body, result.status);
+  }
+
+  if (path === "/api/admin/leads/import") {
+    if (method !== "POST") return methodNotAllowed(["POST"]);
+    const unauthorized = await requireAdmin(request, env);
+    if (unauthorized) return unauthorized;
+    const parsed = await readJson(request, MAX_JSON_BYTES);
+    if (parsed.error) return parsed.error;
+    const result = await importLeads(env, parsed.value);
+    return jsonResponse(result.body, result.status);
+  }
+
+  if (path === "/api/admin/leads/audience.csv") {
+    if (method !== "GET") return methodNotAllowed(["GET"]);
+    const unauthorized = await requireAdmin(request, env);
+    if (unauthorized) return unauthorized;
+    return new Response(await audienceCsv(env), {
+      headers: {
+        "Cache-Control": "no-store",
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="publico-clientes-ebv-${new Date().toISOString().slice(0, 10)}.csv"`,
+      },
+    });
   }
 
   if (path === "/api/admin/leads") {

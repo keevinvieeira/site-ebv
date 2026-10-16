@@ -98,7 +98,7 @@ export async function listLeads(env) {
       propertyTitle: row.property_title,
       value: row.value,
       notes: data.notes || "",
-      origin: originLabel(data.tracking || {}),
+      origin: data.imported ? "Lista de clientes" : originLabel(data.tracking || {}),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -162,6 +162,62 @@ export async function updateLead(request, env, ctx, id, body) {
   }
 
   return { status: 200, body: { ok: true, stage, value } };
+}
+
+// Importa clientes antigos (planilha) direto como "fechado". Não envia nada à Meta:
+// esses contatos viram público personalizado pela exportação abaixo.
+export async function importLeads(env, body) {
+  await ensureSchema(env);
+  const rows = body && Array.isArray(body.rows) ? body.rows : null;
+  if (!rows || rows.length === 0 || rows.length > 5000) {
+    return { status: 400, body: { error: { code: "invalid_rows", message: "Envie de 1 a 5000 linhas." } } };
+  }
+  const now = new Date().toISOString();
+  const existing = new Set((await env.DB.prepare("SELECT phone FROM leads").all()).results.map(r => r.phone));
+  let imported = 0;
+  let skipped = 0;
+  const statements = [];
+  for (const raw of rows) {
+    const name = typeof raw.name === "string" ? raw.name.trim().slice(0, 120) : "";
+    const phone = typeof raw.phone === "string" ? raw.phone.replace(/\D/g, "").replace(/^0+/, "") : "";
+    const emailRaw = typeof raw.email === "string" ? raw.email.trim().toLowerCase() : "";
+    const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw) ? emailRaw.slice(0, 254) : null;
+    const leadType = raw.leadType === "proprietario" ? "proprietario" : "comprador";
+    const note = typeof raw.note === "string" ? raw.note.trim().slice(0, 1000) : "";
+    if (!name || (phone.length < 10 && !email) || (phone && existing.has(phone))) {
+      skipped += 1;
+      continue;
+    }
+    if (phone) existing.add(phone);
+    const id = crypto.randomUUID();
+    const data = { eventId: null, tracking: {}, imported: true, notes: note, history: [{ to: "fechado", at: now, imported: true }] };
+    statements.push(env.DB.prepare(
+      `INSERT INTO leads (id, ref, kind, lead_type, stage, name, phone, email, property_id, property_title, value, data, created_at, updated_at)
+       VALUES (?, ?, 'importado', ?, 'fechado', ?, ?, ?, NULL, ?, NULL, ?, ?, ?)`,
+    ).bind(id, makeRef() + "-" + id.slice(0, 4).toUpperCase(), leadType, name, phone, email, "Cliente antigo", JSON.stringify(data), now, now));
+    imported += 1;
+  }
+  for (let i = 0; i < statements.length; i += 50) {
+    await env.DB.batch(statements.slice(i, i + 50));
+  }
+  return { status: 200, body: { ok: true, imported, skipped } };
+}
+
+// CSV no formato aceito pelo upload de público personalizado da Meta
+// (a Meta criptografa na hora do envio). Inclui todos os negócios fechados.
+export async function audienceCsv(env) {
+  await ensureSchema(env);
+  const result = await env.DB.prepare(
+    "SELECT name, phone, email FROM leads WHERE stage = 'fechado' ORDER BY created_at",
+  ).all();
+  const esc = v => `"${String(v || "").replace(/"/g, '""')}"`;
+  const lines = ["email,phone,fn,ln,country"];
+  for (const r of result.results) {
+    const parts = String(r.name || "").trim().toLowerCase().split(/\s+/);
+    const phone = r.phone ? normalizePhone(r.phone) : "";
+    lines.push([r.email || "", phone, parts[0] || "", parts.length > 1 ? parts[parts.length - 1] : "", "br"].map(esc).join(","));
+  }
+  return "\uFEFF" + lines.join("\n") + "\n";
 }
 
 export async function deleteLead(env, id) {

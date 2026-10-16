@@ -447,6 +447,86 @@ document.addEventListener("change", e => {
   if (e.target.id === "leads-filter-stage") renderLeads();
 });
 
+// ---------- Importação de clientes antigos (CSV do Excel/Google Planilhas) ----------
+function parseCsv(text) {
+  const firstLine = text.split(/\r?\n/)[0] || "";
+  const delim = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ";" : ",";
+  const rows = [];
+  let row = [], field = "", inQuotes = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"' && text[i + 1] === '"') { field += '"'; i += 1; }
+      else if (ch === '"') inQuotes = false;
+      else field += ch;
+    } else if (ch === '"') inQuotes = true;
+    else if (ch === delim) { row.push(field); field = ""; }
+    else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i += 1;
+      row.push(field); field = "";
+      if (row.some(c => c.trim())) rows.push(row);
+      row = [];
+    } else field += ch;
+  }
+  row.push(field);
+  if (row.some(c => c.trim())) rows.push(row);
+  return rows;
+}
+
+function mapClientRows(rows) {
+  if (!rows.length) return [];
+  const norm = v => String(v || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+  const header = rows[0].map(norm);
+  const find = keys => header.findIndex(h => keys.some(k => h.includes(k)));
+  let idx = {
+    name: find(["nome", "name", "cliente"]),
+    phone: find(["telefone", "celular", "whatsapp", "fone", "phone", "tel"]),
+    email: find(["e-mail", "email"]),
+    type: find(["tipo", "perfil"]),
+    note: find(["obs", "nota", "imovel", "comentario"])
+  };
+  let body = rows.slice(1);
+  if (idx.name === -1 && idx.phone === -1) {
+    idx = { name: 0, phone: 1, email: 2, type: -1, note: -1 };
+    body = rows;
+  }
+  const get = (r, i) => (i >= 0 && r[i] != null ? String(r[i]).trim() : "");
+  return body.map(r => ({
+    name: get(r, idx.name),
+    phone: get(r, idx.phone),
+    email: get(r, idx.email),
+    leadType: /propriet|vend/i.test(get(r, idx.type)) ? "proprietario" : "comprador",
+    note: get(r, idx.note)
+  })).filter(r => r.name);
+}
+
+async function readFileText(file) {
+  const buf = await file.arrayBuffer();
+  const utf8 = new TextDecoder("utf-8").decode(buf);
+  return utf8.includes("�") ? new TextDecoder("windows-1252").decode(buf) : utf8.replace(/^﻿/, "");
+}
+
+document.addEventListener("change", async e => {
+  if (e.target.id !== "leads-import-file") return;
+  const input = e.target;
+  const file = input.files && input.files[0];
+  input.value = "";
+  if (!file) return;
+  try {
+    const rows = mapClientRows(parseCsv(await readFileText(file)));
+    if (!rows.length) {
+      alert("Não encontrei clientes no arquivo. Use colunas Nome, Telefone e E-mail (opcional).");
+      return;
+    }
+    if (!confirm(`Importar ${rows.length} clientes antigos como negócios fechados?`)) return;
+    const result = await apiRequest("/api/admin/leads/import", { method: "POST", body: JSON.stringify({ rows }) });
+    alert(`${result.imported} clientes importados. ${result.skipped} ignorados (sem telefone/e-mail válido ou já cadastrados).`);
+    await loadAdminLeads();
+  } catch (err) {
+    alert("Não foi possível importar o arquivo: " + (err.message || err));
+  }
+});
+
 document.addEventListener("click", e => {
   const del = e.target.closest && e.target.closest("[data-lead-delete]");
   if (del) deleteLeadAdmin(del.dataset.leadDelete);

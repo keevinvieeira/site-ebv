@@ -589,6 +589,12 @@
         <div id="admin-tab-leads" class="admin-container">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 15px;">
             <p style="font-size: 0.85rem; color: var(--text-light); margin: 0; max-width: 620px;">Todo contato pelo WhatsApp do site e todo pedido de avaliação entra aqui. Ao mudar a etapa para Qualificado, Visita, Proposta ou Fechado, a informação volta para a Meta e ajuda os anúncios a encontrar clientes parecidos.</p>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <label class="btn-secondary" style="cursor: pointer; font-size: 0.8rem; padding: 8px 14px; border-radius: 20px; margin: 0;">Importar clientes antigos (CSV)
+                <input type="file" id="leads-import-file" accept=".csv,.txt,text/csv" style="display: none;">
+              </label>
+              <a href="/api/admin/leads/audience.csv" download class="btn-secondary" style="font-size: 0.8rem; padding: 8px 14px; border-radius: 20px; text-decoration: none;">Baixar público para a Meta</a>
+            </div>
             <label style="font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 8px;">Mostrar
               <select id="leads-filter-stage" style="padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border-color);">
                 <option value="abertos">Em andamento</option>
@@ -828,7 +834,7 @@
     <div id="fullscreen-counter" style="position: absolute; bottom: 30px; color: #fff; font-family: var(--font-sub); font-size: 0.9rem; background: rgba(255,255,255,0.1); padding: 6px 18px; border-radius: 20px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15);">1 / 1</div>
   </div>
 
-  <script src="tracking.js?v=20261016_leads"></script>
-  <script src="app.js?v=20261016_leads"></script>
+  <script src="tracking.js?v=20261016_import"></script>
+  <script src="app.js?v=20261016_import"></script>
 </body>
 </html>
