@@ -1,4 +1,5 @@
-import { postLead, leadFromAppraisal, listLeads, updateLead, deleteLead, importLeads, audienceCsv } from "./leads.js";
+import { postLead, leadFromAppraisal, listLeads, updateLead, deleteLead, importLeads, audienceCsv, createManualLead } from "./leads.js";
+import { handleCrmAdmin, handleAgentApi, afterPropertiesSaved, catalogCsv } from "./crm.js";
 
 const SESSION_COOKIE = "ebv_session";
 const SESSION_TTL_SECONDS = 8 * 60 * 60;
@@ -27,6 +28,10 @@ export default {
         response = await handleApi(request, env, url, ctx);
       } else if (url.pathname.startsWith("/media/")) {
         response = await handleMedia(request, env, url);
+      } else if (url.pathname === "/catalog.csv") {
+        response = new Response(await catalogCsv(env, url.origin), {
+          headers: { "Content-Type": "text/csv; charset=utf-8", "Cache-Control": "public, max-age=900" },
+        });
       } else if (url.pathname.startsWith("/imovel/")) {
         response = await handlePropertyPage(request, env, url);
       } else {
@@ -95,6 +100,17 @@ async function handleApi(request, env, url, ctx) {
     return jsonResponse(result.body, result.status);
   }
 
+  if (path.startsWith("/api/admin/crm/")) {
+    const unauthorized = await requireAdmin(request, env);
+    if (unauthorized) return unauthorized;
+    const response = await handleCrmAdmin(request, env, ctx, path, method, () => readJson(request, 64 * 1024), { createManualLead, updateLead });
+    return response || jsonError(404, "not_found", "Rota não encontrada.");
+  }
+
+  if (path.startsWith("/api/agent/")) {
+    return handleAgentApi(request, env, ctx, path, method, () => readJson(request, 64 * 1024), { createManualLead, updateLead });
+  }
+
   if (path === "/api/admin/leads/import") {
     if (method !== "POST") return methodNotAllowed(["POST"]);
     const unauthorized = await requireAdmin(request, env);
@@ -161,7 +177,7 @@ async function handleApi(request, env, url, ctx) {
     if (method !== "PUT") return methodNotAllowed(["PUT"]);
     const unauthorized = await requireAdmin(request, env);
     if (unauthorized) return unauthorized;
-    return replaceProperties(request, env);
+    return replaceProperties(request, env, ctx);
   }
 
   if (path === "/api/admin/images") {
@@ -377,7 +393,7 @@ async function getAppraisals(env) {
   return jsonResponse(result.results.map(rowToObject));
 }
 
-async function replaceProperties(request, env) {
+async function replaceProperties(request, env, ctx) {
   const parsed = await readJson(request, MAX_JSON_BYTES);
   if (parsed.error) return parsed.error;
 
@@ -417,8 +433,12 @@ async function replaceProperties(request, env) {
     ).bind(id, data, index, now));
   }
 
+  const previousIds = new Set((await env.DB.prepare("SELECT id FROM properties").all()).results.map(r => r.id));
+
   // D1 executes a batch sequentially as one transaction and rolls it back on failure.
   await env.DB.batch(statements);
+
+  ctx.waitUntil(afterPropertiesSaved(env, ctx, previousIds, properties).catch(err => console.error("match failed", err)));
   return jsonResponse({ ok: true, count: properties.length });
 }
 

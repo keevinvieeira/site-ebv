@@ -2,6 +2,9 @@
 // Tudo que depende da Meta é opcional: sem META_PIXEL_ID / META_CAPI_TOKEN o lead
 // é salvo normalmente e o evento fica registrado como "skipped".
 
+import { ensureSchema, upsertContactRow, canonicalPhone, safeJson } from "./schema.js";
+import { attachLeadToContact, afterLeadSaved, afterStageChange, originLabel } from "./crm.js";
+
 const encoder = new TextEncoder();
 
 export const STAGES = ["novo", "contatado", "qualificado", "visita", "proposta", "fechado", "perdido"];
@@ -15,27 +18,6 @@ const STAGE_EVENTS = {
 };
 
 const DEDUP_WINDOW_MS = 30 * 60 * 1000;
-
-// Mesmo conteúdo de migrations/0002_leads.sql; garante as tabelas mesmo sem rodar a migration.
-const SCHEMA = [
-  `CREATE TABLE IF NOT EXISTS leads ( id TEXT PRIMARY KEY NOT NULL, ref TEXT NOT NULL, kind TEXT NOT NULL, lead_type TEXT NOT NULL, stage TEXT NOT NULL DEFAULT 'novo', name TEXT NOT NULL, phone TEXT NOT NULL, email TEXT, property_id TEXT, property_title TEXT, value REAL, data TEXT NOT NULL CHECK (json_valid(data)), created_at TEXT NOT NULL, updated_at TEXT NOT NULL )`,
-  `CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads (created_at DESC, id DESC)`,
-  `CREATE INDEX IF NOT EXISTS idx_leads_phone ON leads (phone)`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS idx_leads_ref ON leads (ref)`,
-  `CREATE TABLE IF NOT EXISTS lead_events ( id TEXT PRIMARY KEY NOT NULL, lead_id TEXT NOT NULL, event_name TEXT NOT NULL, stage TEXT, meta_status TEXT NOT NULL, meta_response TEXT, created_at TEXT NOT NULL )`,
-  `CREATE INDEX IF NOT EXISTS idx_lead_events_lead ON lead_events (lead_id, created_at)`,
-];
-
-let schemaReady = null;
-function ensureSchema(env) {
-  if (!schemaReady) {
-    schemaReady = env.DB.batch(SCHEMA.map(sql => env.DB.prepare(sql))).catch(err => {
-      schemaReady = null;
-      throw err;
-    });
-  }
-  return schemaReady;
-}
 
 // ---------- API pública ----------
 
@@ -54,6 +36,7 @@ export async function postLead(request, env, ctx, body) {
     propertyTitle: v.value.propertyTitle,
     value: v.value.value,
     tracking: v.value.tracking,
+    viewed: v.value.viewed,
     extra: { context: v.value.context },
   });
   return { status: 201, body: { id: lead.id, ref: lead.ref, eventId: lead.eventId, duplicate: lead.duplicate === true } };
@@ -73,6 +56,7 @@ export async function leadFromAppraisal(request, env, ctx, appraisal, rawBody) {
     propertyTitle: `${appraisal.type} - ${appraisal.location}`,
     value: null,
     tracking,
+    viewed: rawBody && Array.isArray(rawBody.viewed) ? rawBody.viewed.filter(x => typeof x === "string" && x.length <= 200).slice(0, 20) : [],
     extra: { appraisalId: appraisal.id, area: appraisal.area, details: appraisal.details },
   });
 }
@@ -80,7 +64,7 @@ export async function leadFromAppraisal(request, env, ctx, appraisal, rawBody) {
 export async function listLeads(env) {
   await ensureSchema(env);
   const result = await env.DB.prepare(
-    `SELECT id, ref, kind, lead_type, stage, name, phone, email, property_id, property_title, value, data, created_at, updated_at
+    `SELECT id, ref, kind, lead_type, stage, name, phone, email, property_id, property_title, value, contact_id, lost_reason, data, created_at, updated_at
        FROM leads ORDER BY created_at DESC, id DESC LIMIT 1000`,
   ).all();
   return result.results.map(row => {
@@ -97,6 +81,8 @@ export async function listLeads(env) {
       propertyId: row.property_id,
       propertyTitle: row.property_title,
       value: row.value,
+      contactId: row.contact_id,
+      lostReason: row.lost_reason,
       notes: data.notes || "",
       origin: data.imported ? "Lista de clientes" : originLabel(data.tracking || {}),
       createdAt: row.created_at,
@@ -116,6 +102,10 @@ export async function updateLead(request, env, ctx, id, body) {
   const data = safeJson(row.data);
   let stage = row.stage;
   let value = row.value;
+  let lostReason = row.lost_reason || null;
+  if (body.lostReason !== undefined) {
+    lostReason = typeof body.lostReason === "string" && body.lostReason.trim() ? body.lostReason.trim().slice(0, 200) : null;
+  }
 
   if (body.stage !== undefined) {
     if (!STAGES.includes(body.stage)) {
@@ -142,8 +132,16 @@ export async function updateLead(request, env, ctx, id, body) {
   }
 
   const now = new Date().toISOString();
-  await env.DB.prepare("UPDATE leads SET stage = ?, value = ?, data = ?, updated_at = ? WHERE id = ?")
-    .bind(stage, value, JSON.stringify(data), now, id).run();
+  await env.DB.prepare("UPDATE leads SET stage = ?, value = ?, lost_reason = ?, data = ?, updated_at = ? WHERE id = ?")
+    .bind(stage, value, lostReason, JSON.stringify(data), now, id).run();
+
+  if (stage !== row.stage) {
+    try {
+      await afterStageChange(env, { leadId: id, contactId: row.contact_id, from: row.stage, to: stage, lostReason });
+    } catch (err) {
+      console.error("afterStageChange failed", err);
+    }
+  }
 
   const eventName = STAGE_EVENTS[stage];
   if (eventName && stage !== row.stage) {
@@ -190,11 +188,12 @@ export async function importLeads(env, body) {
     }
     if (phone) existing.add(phone);
     const id = crypto.randomUUID();
+    const contactId = await upsertContactRow(env, { name, phone: phone || null, email, role: "cliente", source: "importado", at: now });
     const data = { eventId: null, tracking: {}, imported: true, notes: note, history: [{ to: "fechado", at: now, imported: true }] };
     statements.push(env.DB.prepare(
-      `INSERT INTO leads (id, ref, kind, lead_type, stage, name, phone, email, property_id, property_title, value, data, created_at, updated_at)
-       VALUES (?, ?, 'importado', ?, 'fechado', ?, ?, ?, NULL, ?, NULL, ?, ?, ?)`,
-    ).bind(id, makeRef() + "-" + id.slice(0, 4).toUpperCase(), leadType, name, phone, email, "Cliente antigo", JSON.stringify(data), now, now));
+      `INSERT INTO leads (id, ref, kind, lead_type, stage, name, phone, email, property_id, property_title, value, contact_id, data, created_at, updated_at)
+       VALUES (?, ?, 'importado', ?, 'fechado', ?, ?, ?, NULL, ?, NULL, ?, ?, ?, ?)`,
+    ).bind(id, makeRef() + "-" + id.slice(0, 4).toUpperCase(), leadType, name, phone, email, "Cliente antigo", contactId, JSON.stringify(data), now, now));
     imported += 1;
   }
   for (let i = 0; i < statements.length; i += 50) {
@@ -247,6 +246,17 @@ async function saveLead(request, env, ctx, input) {
     return { id: dup.id, ref: dup.ref, eventId: d.eventId, duplicate: true };
   }
 
+  // Mesma pessoa com negócio em aberto: não abre outro, registra o novo interesse.
+  const { contactId, openLead } = await attachLeadToContact(env, {
+    name: input.name, phone: phoneDigits, email: input.email, leadType: input.leadType, kind: input.kind,
+  });
+  const origin = originLabel(input.tracking || {});
+  if (openLead) {
+    await env.DB.prepare("UPDATE leads SET updated_at = ? WHERE id = ?").bind(nowIso, openLead.id).run();
+    await afterLeadSaved(env, ctx, { contactId, leadId: openLead.id, ref: openLead.ref, isNew: false, input: { ...input, origin } });
+    return { id: openLead.id, ref: openLead.ref, eventId: openLead.eventId, duplicate: true };
+  }
+
   const id = crypto.randomUUID();
   const eventId = input.tracking.eventId || `lead:${id}`;
   const data = {
@@ -265,11 +275,11 @@ async function saveLead(request, env, ctx, input) {
     ref = makeRef();
     try {
       await env.DB.prepare(
-        `INSERT INTO leads (id, ref, kind, lead_type, stage, name, phone, email, property_id, property_title, value, data, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'novo', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO leads (id, ref, kind, lead_type, stage, name, phone, email, property_id, property_title, value, contact_id, data, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'novo', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         id, ref, input.kind, input.leadType, input.name, phoneDigits, input.email || null,
-        input.propertyId || null, input.propertyTitle || null, input.value ?? null,
+        input.propertyId || null, input.propertyTitle || null, input.value ?? null, contactId,
         JSON.stringify(data), nowIso, nowIso,
       ).run();
       break;
@@ -290,7 +300,33 @@ async function saveLead(request, env, ctx, input) {
     stage: "novo",
   }));
 
+  try {
+    await afterLeadSaved(env, ctx, { contactId, leadId: id, ref, isNew: true, input: { ...input, origin } });
+  } catch (err) {
+    console.error("afterLeadSaved failed", err);
+  }
+
   return { id, ref, eventId };
+}
+
+// Negócio criado pelo painel ou pelo agente (sem evento de Lead para a Meta).
+export async function createManualLead(env, { contactId, name, phone, email, leadType, kind = "manual" }) {
+  await ensureSchema(env);
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const data = { eventId: null, tracking: {}, history: [{ to: "novo", at: now }] };
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await env.DB.prepare(
+        `INSERT INTO leads (id, ref, kind, lead_type, stage, name, phone, email, property_id, property_title, value, contact_id, data, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'novo', ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?)`,
+      ).bind(id, makeRef(), kind, leadType, name, String(phone || "").replace(/\D/g, ""), email || null, contactId, JSON.stringify(data), now, now).run();
+      return id;
+    } catch (err) {
+      if (attempt === 4 || !String(err && err.message).includes("UNIQUE")) throw err;
+    }
+  }
+  return id;
 }
 
 async function sendAndLog(env, lead, { eventName, eventId, actionSource, stage }) {
@@ -352,7 +388,7 @@ async function buildEvent(lead, { eventName, eventId, actionSource }) {
   };
   if (lead.property_id) {
     customData.content_ids = [lead.property_id];
-    customData.content_type = "home_listing";
+    customData.content_type = "product";
   }
   if (lead.property_title) customData.content_name = lead.property_title;
   // Valor só no fechamento, para não inflar o retorno com preço de imóvel em leads.
@@ -389,6 +425,7 @@ function validateLeadInput(value) {
     value: {
       name, phone, leadType, context, propertyId, propertyTitle, value: leadValue,
       tracking: sanitizeTracking(value.tracking),
+      viewed: Array.isArray(value.viewed) ? value.viewed.filter(x => typeof x === "string" && x.length <= 200).slice(0, 20) : [],
     },
   };
 }
@@ -406,19 +443,6 @@ function sanitizeTracking(t) {
   return out;
 }
 
-function originLabel(t) {
-  if (t.fbclid || t.fbc || /facebook|instagram|meta|^fb$|^ig$/i.test(t.utm_source || "")) {
-    return t.utm_campaign ? `Meta Ads (${t.utm_campaign})` : "Meta / Instagram";
-  }
-  if (t.gclid || /google/i.test(t.utm_source || "")) return "Google";
-  if (t.utm_source) return t.utm_source;
-  if (t.referrer && /instagram/i.test(t.referrer)) return "Instagram";
-  if (t.referrer) {
-    try { return new URL(t.referrer).hostname.replace(/^www\./, ""); } catch { /* ignore */ }
-  }
-  return "Direto";
-}
-
 function normalizePhone(digits) {
   const d = String(digits).replace(/\D/g, "").replace(/^0+/, "");
   return d.length === 10 || d.length === 11 ? `55${d}` : d;
@@ -433,8 +457,4 @@ function makeRef() {
 async function sha256(text) {
   const digest = await crypto.subtle.digest("SHA-256", encoder.encode(String(text)));
   return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
-}
-
-function safeJson(text) {
-  try { return JSON.parse(text) || {}; } catch { return {}; }
 }

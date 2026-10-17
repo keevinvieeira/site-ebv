@@ -111,11 +111,23 @@
   }
 
   // ---------- Eventos do site ----------
+  function rememberViewed(id) {
+    const list = (readJSON("ebv_viewed") || []).filter(x => x !== id);
+    list.unshift(id);
+    setLS("ebv_viewed", JSON.stringify(list.slice(0, 20)));
+  }
+
+  function getViewed() {
+    const list = readJSON("ebv_viewed");
+    return Array.isArray(list) ? list.slice(0, 20) : [];
+  }
+
   function viewContent(prop) {
     if (!prop) return;
+    rememberViewed(prop.id);
     track("ViewContent", {
       content_ids: [prop.id],
-      content_type: "home_listing",
+      content_type: "product",
       content_name: prop.title,
       value: Number(prop.price) || undefined,
       currency: "BRL",
@@ -234,6 +246,7 @@
           propertyTitle: ctx.property ? ctx.property.title : null,
           value: ctx.property ? ctx.property.price : null,
           tracking: { ...collect(), eventId },
+          viewed: getViewed(),
         }),
         signal: controller.signal,
       });
@@ -304,7 +317,7 @@
     if (btn) setTimeout(loadPixel, 0);
   });
 
-  window.EBVTracking = { collect, newEventId, track, viewContent, loadPixel };
+  window.EBVTracking = { collect, newEventId, track, viewContent, loadPixel, getViewed };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);

@@ -22,6 +22,8 @@ preview_urls = false
 #   META_PIXEL_ID    (ID do conjunto de dados/Pixel da Meta; liga o Pixel no site)
 #   META_CAPI_TOKEN  (token da Conversions API, gerado no Gerenciador de Eventos)
 #   META_TEST_EVENT_CODE (opcional, só para testar eventos no Gerenciador de Eventos)
+#   RESEND_API_KEY + NOTIFY_EMAIL (aviso de lead novo por e-mail; NOTIFY_FROM opcional)
+#   AGENT_TOKEN      (token da API de automação /api/agent/*, para o agente de WhatsApp)
 # Sem ADMIN_PASSWORD o painel fica bloqueado (não há senha no código).
 
 [vars]
@@ -31,7 +33,7 @@ META_PIXEL_ID = "1430221655110940"  # Conjunto de dados "EBV Imóveis - Site" (p
 [assets]
 directory = "."
 binding = "ASSETS"
-run_worker_first = ["/api/*", "/media/*", "/imovel/*"]
+run_worker_first = ["/api/*", "/media/*", "/imovel/*", "/catalog.csv"]
 not_found_handling = "single-page-application"
 
 [[d1_databases]]
