@@ -337,6 +337,7 @@ const LEAD_STAGES = [
 
 async function loadAdminLeads() {
   if (!adminAuthenticated) return;
+  if (window.CRM) window.CRM.load();
   leads = await apiRequest("/api/admin/leads", { method: "GET" });
   renderLeads();
 }
@@ -1183,7 +1184,8 @@ async function submitAppraisal(event) {
     area,
     location,
     details,
-    tracking: window.EBVTracking ? { ...window.EBVTracking.collect(), eventId } : undefined
+    tracking: window.EBVTracking ? { ...window.EBVTracking.collect(), eventId } : undefined,
+    viewed: window.EBVTracking ? window.EBVTracking.getViewed() : []
   };
 
   const submitBtn = event.submitter;
