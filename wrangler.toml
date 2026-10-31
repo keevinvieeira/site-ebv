@@ -33,7 +33,7 @@ META_PIXEL_ID = "1430221655110940"  # Conjunto de dados "EBV Imóveis - Site" (p
 [assets]
 directory = "."
 binding = "ASSETS"
-run_worker_first = ["/api/*", "/media/*", "/imovel/*", "/catalog.csv"]
+run_worker_first = ["/api/*", "/media/*", "/imovel/*", "/catalog.csv", "/branding*"]
 not_found_handling = "single-page-application"
 
 [[d1_databases]]

@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EBV Imóveis | Manual de Identidade Visual Oficial &amp; Brand Portal</title>
+  <meta name="description" content="Manual de Identidade Visual Oficial da EBV Imóveis (Edicleia Borba Vieira). Download de arquivos 4K, padrões tipográficos e diretrizes da marca." />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" type="image/png" href="/assets/logo_icon.png" />
+
+  <!-- Fonts: Playfair Display + Montserrat + Inter + JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Montserrat:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;0,900;1,600;1,700&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            surface: '#0a0b0e',
+            'surface-container': '#12141a',
+            'surface-low': '#191c24',
+            primary: '#722f37',
+            'primary-dark': '#5c061f',
+            ruby: '#c6273a',
+            gold: '#c5a059',
+            silver: '#8e8e93',
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            heading: ['Playfair Display', 'serif'],
+            sub: ['Montserrat', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-surface text-gray-100 font-sans antialiased selection:bg-primary selection:text-white">
+
+  <!-- Top Navigation Header -->
+  <header class="sticky top-0 z-50 bg-surface/90 backdrop-blur-xl border-b border-white/10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3 group">
+        <img src="/assets/logo_icon.png" alt="EBV Imóveis" class="w-10 h-10 object-contain drop-shadow group-hover:scale-105 transition-transform" />
+        <div class="flex flex-col">
+          <span class="font-heading font-bold text-xl text-white group-hover:text-gold transition-colors leading-none mb-1">EBV IMÓVEIS</span>
+          <span class="font-mono text-[9px] text-silver tracking-widest uppercase leading-none">ALTO PADRÃO &bull; CURITIBA &bull; CRECI 14269</span>
+        </div>
+      </a>
+
+      <div class="flex items-center gap-4">
+        <span class="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/20 border border-primary/40 text-[11px] font-mono text-white/90">
+          <span class="w-2 h-2 rounded-full bg-ruby animate-pulse"></span>
+          Página Interna &bull; Manual Oficial
+        </span>
+        <a href="/" class="font-mono text-xs text-gray-400 hover:text-white transition-colors flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-white/10 hover:border-white/20">
+          <span>&larr;</span> Voltar ao Site
+        </a>
+        <a href="#downloads" class="hidden sm:inline-flex items-center gap-1.5 bg-primary hover:bg-primary-dark text-white font-mono text-xs font-semibold px-4 py-2 rounded-lg transition-all shadow-lg shadow-primary/30">
+          Downloads 4K
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="py-16 md:py-24 px-4 sm:px-6 lg:px-8 border-b border-white/10 relative overflow-hidden">
+    <div class="absolute inset-0 bg-radial from-primary/10 via-transparent to-transparent pointer-events-none"></div>
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-12">
+      <div class="max-w-2xl space-y-6">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/15 border border-primary/40 text-rose-300 font-mono text-xs font-semibold">
+          <span class="w-2 h-2 rounded-full bg-ruby animate-pulse"></span>
+          IDENTIDADE VISUAL OFICIAL &bull; MANUAL DA MARCA (USO INTERNO)
+        </div>
+        <h1 class="font-heading text-4xl sm:text-5xl md:text-6xl font-black text-white tracking-tight leading-tight">
+          Brand Portal &amp; Diretrizes da Marca
+        </h1>
+        <p class="text-gray-300 text-base md:text-lg leading-relaxed">
+          Guia completo de padrões visuais, especificações de design, paleta cromática, tipografia e download de todos os ativos oficiais da <strong>EBV Imóveis</strong> em altíssima definição (4K / 300 DPI) para mídias digitais, impressos, placas de venda, contratos e papelaria corporativa de alto padrão.
+        </p>
+        <div class="flex flex-wrap items-center gap-4 pt-2">
+          <a href="#downloads" class="bg-primary hover:bg-primary-dark text-white font-mono font-bold text-xs px-5 py-3 rounded-xl transition-all shadow-lg shadow-primary/30 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Baixar Pacote de Logos 4K
+          </a>
+          <a href="#anatomia" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white font-mono text-xs px-5 py-3 rounded-xl transition-all">
+            Anatomia do Símbolo
+          </a>
+          <a href="#paleta" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white font-mono text-xs px-5 py-3 rounded-xl transition-all">
+            Paleta de Cores
+          </a>
+        </div>
+      </div>
+
+      <div class="w-full max-w-md bg-surface-container border border-white/10 rounded-2xl p-6 shadow-2xl relative group">
+        <div class="absolute -inset-1 bg-gradient-to-r from-primary/30 via-ruby/20 to-gold/20 rounded-2xl blur opacity-60 group-hover:opacity-100 transition duration-1000"></div>
+        <div class="relative bg-surface-container rounded-xl overflow-hidden p-6 flex flex-col items-center">
+          <div class="w-full flex justify-between items-center text-[10px] font-mono text-gray-400 mb-2 border-b border-white/10 pb-3">
+            <span class="text-rose-300 font-bold uppercase tracking-wider">Brasão Oficial</span>
+            <span class="bg-primary/20 text-white px-2 py-0.5 rounded border border-primary/30">Vetor 4K</span>
+          </div>
+          <img src="/branding/assets/EBV_Icone_Chave_Borboleta_Transparente_4K.png" alt="Símbolo Oficial EBV" class="w-52 h-auto object-contain drop-shadow-2xl my-6 group-hover:scale-105 transition-transform duration-500" />
+          <div class="w-full border-t border-white/10 pt-4 mt-2 flex justify-between items-center text-xs font-mono text-gray-400">
+            <span>A Chave &bull; As Asas de Borboleta</span>
+            <span class="text-gold font-bold">Edicleia Borba Vieira</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 1: Conceito & Simbologia -->
+  <section id="anatomia" class="py-16 px-4 sm:px-6 lg:px-8 border-b border-white/10">
+    <div class="max-w-7xl mx-auto space-y-12">
+      <div class="space-y-3">
+        <span class="font-mono text-xs text-ruby font-bold uppercase tracking-widest">01 // Significado e Geometria</span>
+        <h2 class="font-heading text-3xl sm:text-4xl font-bold text-white">Anatomia do Símbolo &amp; Posicionamento</h2>
+        <p class="text-gray-400 text-sm max-w-2xl">
+          Concepção visual refinada que une solidez patrimonial, a segurança jurídica imobiliária e o acolhimento humano na transformação de vida dos clientes.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- 1. A Chave -->
+        <div class="bg-surface-container border border-white/10 rounded-2xl p-6 flex flex-col justify-between hover:border-ruby/40 transition-colors">
+          <div>
+            <div class="w-10 h-10 rounded-xl bg-ruby/15 border border-ruby/30 flex items-center justify-center text-rose-300 font-bold font-mono mb-4">01</div>
+            <h3 class="font-heading font-bold text-xl text-white mb-2">A Chave da Conquista</h3>
+            <p class="text-gray-400 text-xs sm:text-sm leading-relaxed">
+              Representa segurança, abertura de novas portas, a solidez dos negócios imobiliários e a concretização do lar dos sonhos. É o símbolo universal da posse e da segurança jurídica.
+            </p>
+          </div>
+          <span class="font-mono text-[10px] text-gray-500 uppercase mt-4 block pt-3 border-t border-white/5">Segurança &bull; Patrimônio &bull; Conquista</span>
+        </div>
+
+        <!-- 2. As Asas de Borboleta -->
+        <div class="bg-surface-container border border-white/10 rounded-2xl p-6 flex flex-col justify-between hover:border-gold/40 transition-colors">
+          <div>
+            <div class="w-10 h-10 rounded-xl bg-gold/15 border border-gold/30 flex items-center justify-center text-gold font-bold font-mono mb-4">02</div>
+            <h3 class="font-heading font-bold text-xl text-white mb-2">Asas de Borboleta</h3>
+            <p class="text-gray-400 text-xs sm:text-sm leading-relaxed">
+              Simbolizam a transformação, leveza, liberdade, renovação e o sonho de mudar de vida. Expressa o acolhimento sensível nos momentos mais marcantes da vida de cada cliente.
+            </p>
+          </div>
+          <span class="font-mono text-[10px] text-gold uppercase mt-4 block pt-3 border-t border-white/5">Transformação &bull; Leveza &bull; Evolução</span>
+        </div>
+
+        <!-- 3. Atendimento Humanizado -->
+        <div class="bg-surface-container border border-white/10 rounded-2xl p-6 flex flex-col justify-between hover:border-primary/40 transition-colors">
+          <div>
+            <div class="w-10 h-10 rounded-xl bg-primary/20 border border-primary/40 flex items-center justify-center text-white font-bold font-mono mb-4">03</div>
+            <h3 class="font-heading font-bold text-xl text-white mb-2">Atendimento Humanizado</h3>
+            <p class="text-gray-400 text-xs sm:text-sm leading-relaxed">
+              Inspirado na trajetória de Edicleia Borba Vieira, combinando sólida formação em Recursos Humanos (foco genuíno em pessoas) com mais de 25 anos de experiência e relações de fidelidade em Curitiba.
+            </p>
+          </div>
+          <span class="font-mono text-[10px] text-rose-300 uppercase mt-4 block pt-3 border-t border-white/5">25 Anos &bull; Empatia &bull; Relações Sólidas</span>
+        </div>
+
+        <!-- 4. Alto Padrão & Sofisticação -->
+        <div class="bg-surface-container border border-white/10 rounded-2xl p-6 flex flex-col justify-between hover:border-silver/40 transition-colors">
+          <div>
+            <div class="w-10 h-10 rounded-xl bg-silver/15 border border-silver/30 flex items-center justify-center text-silver font-bold font-mono mb-4">04</div>
+            <h3 class="font-heading font-bold text-xl text-white mb-2">Alto Padrão Curitibano</h3>
+            <p class="text-gray-400 text-xs sm:text-sm leading-relaxed">
+              Linhas limpas e curvas refinadas que transmitem nobreza sem excessos, conectando a arquitetura contemporânea e os bairros mais nobres da capital paranaense.
+            </p>
+          </div>
+          <span class="font-mono text-[10px] text-silver uppercase mt-4 block pt-3 border-t border-white/5">Sofisticação &bull; Exclusividade &bull; Confiança</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 2: Downloads Oficiais em 4K -->
+  <section id="downloads" class="py-16 px-4 sm:px-6 lg:px-8 border-b border-white/10 bg-surface-container/30">
+    <div class="max-w-7xl mx-auto space-y-12">
+      <div class="space-y-3">
+        <span class="font-mono text-xs text-gold font-bold uppercase tracking-widest">02 // Ativos Oficiais</span>
+        <h2 class="font-heading text-3xl sm:text-4xl font-bold text-white">Logos Mestres em Alta Definição (4K / 300 DPI)</h2>
+        <p class="text-gray-400 text-sm max-w-2xl">
+          Arquivos de altíssima definição para download imediato. Clique no botão de cada cartão para baixar a versão original em 4K.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+        <!-- 1. Horizontal Fundo Escuro -->
+        <div class="bg-surface-container border border-white/10 rounded-2xl p-6 flex flex-col justify-between space-y-6 hover:border-white/20 transition-all">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <span class="font-mono text-xs text-rose-300 uppercase">// Aplicação em Fundo Escuro</span>
+              <span class="px-2.5 py-1 rounded bg-white/10 text-white font-mono text-[10px] font-bold">4K &bull; 3840x1600</span>
+            </div>
+            <div class="bg-[#0e1015] border border-white/5 rounded-xl p-8 flex items-center justify-center overflow-hidden">
+              <img src="/branding/assets/EBV_Logo_Horizontal_Fundo_Escuro_4K.png" alt="Logo EBV Fundo Escuro" class="w-full h-auto max-h-40 object-contain hover:scale-105 transition-transform duration-300" />
+            </div>
+          </div>
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-white/10">
+            <span class="font-mono text-xs text-gray-400">Ideal para: <strong>Sites, Telas, Vídeos, Painéis Digitais</strong></span>
+            <a href="/branding/assets/EBV_Logo_Horizontal_Fundo_Escuro_4K.png" download="EBV_Logo_Horizontal_Fundo_Escuro_4K.png" class="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white font-mono text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              Baixar PNG 4K
+            </a>
+          </div>
+        </div>
+
+        <!-- 2. Horizontal Fundo Claro -->
+        <div class="bg-surface-container border border-white/10 rounded-2xl p-6 flex flex-col justify-between space-y-6 hover:border-white/20 transition-all">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <span class="font-mono text-xs text-gray-400 uppercase">// Aplicação em Papel Timbrado / Fundo Claro</span>
+              <span class="px-2.5 py-1 rounded bg-white/10 text-white font-mono text-[10px] font-bold">4K &bull; 3840x1600</span>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-xl p-8 flex items-center justify-center overflow-hidden shadow-inner">
+              <img src="/branding/assets/EBV_Logo_Horizontal_Fundo_Claro_4K.png" alt="Logo EBV Fundo Claro" class="w-full h-auto max-h-40 object-contain hover:scale-105 transition-transform duration-300" />
+            </div>
+          </div>
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-white/10">
+            <span class="font-mono text-xs text-gray-400">Ideal para: <strong>Contratos, Pareceres, Propostas A4</strong></span>
+            <a href="/branding/assets/EBV_Logo_Horizontal_Fundo_Claro_4K.png" download="EBV_Logo_Horizontal_Fundo_Claro_4K.png" class="w-full sm:w-auto bg-primary hover:bg-primary-dark text-white font-mono text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg shadow-primary/20">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              Baixar PNG 4K
+            </a>
+          </div>
+        </div>
+
+        <!-- 3. Ícone Chave e Borboleta Transparente -->
+        <div class="bg-surface-container border border-white/10 rounded-2xl p-6 flex flex-col justify-between space-y-6 hover:border-white/20 transition-all">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <span class="font-mono text-xs text-gold uppercase">// Símbolo Isolado (Fundo Transparente)</span>
+              <span class="px-2.5 py-1 rounded bg-white/10 text-white font-mono text-[10px] font-bold">4K &bull; 2560x2560</span>
+            </div>
+            <div class="bg-[radial-gradient(#262933_1px,transparent_1px)] bg-[size:14px_14px] bg-black/60 border border-white/5 rounded-xl p-8 flex items-center justify-center overflow-hidden">
+              <img src="/branding/assets/EBV_Icone_Chave_Borboleta_Transparente_4K.png" alt="Símbolo Transparente EBV" class="h-44 w-auto object-contain drop-shadow-2xl hover:scale-110 transition-transform duration-300" />
+            </div>
+          </div>
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-white/10">
+            <span class="font-mono text-xs text-gray-400">Ideal para: <strong>Favicons, Chaveiros, Gravação a Laser, Selos</strong></span>
+            <a href="/branding/assets/EBV_Icone_Chave_Borboleta_Transparente_4K.png" download="EBV_Icone_Chave_Borboleta_Transparente_4K.png" class="w-full sm:w-auto bg-gold hover:bg-[#b38e4a] text-black font-mono text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              Baixar PNG Transparente
+            </a>
+          </div>
+        </div>
+
+        <!-- 4. Vertical Master 4K -->
+        <div class="bg-surface-container border border-white/10 rounded-2xl p-6 flex flex-col justify-between space-y-6 hover:border-white/20 transition-all">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <span class="font-mono text-xs text-rose-300 uppercase">// Prancha Vertical Master 4K</span>
+              <span class="px-2.5 py-1 rounded bg-white/10 text-white font-mono text-[10px] font-bold">4K &bull; 2700x3200</span>
+            </div>
+            <div class="bg-[#0e1015] border border-white/5 rounded-xl p-6 flex items-center justify-center overflow-hidden">
+              <img src="/branding/assets/EBV_Logo_Vertical_Master_Fundo_Escuro_4K.png" alt="Logo Vertical Master EBV" class="h-44 w-auto object-contain hover:scale-105 transition-transform duration-300 rounded" />
+            </div>
+          </div>
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-white/10">
+            <span class="font-mono text-xs text-gray-400">Ideal para: <strong>Placas de Venda, Totens, Banners, Capas</strong></span>
+            <a href="/branding/assets/EBV_Logo_Vertical_Master_Fundo_Escuro_4K.png" download="EBV_Logo_Vertical_Master_Fundo_Escuro_4K.png" class="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white font-mono text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              Baixar Master 4K
+            </a>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Arquivos Adicionais para Download -->
+      <div class="bg-surface-container border border-white/10 rounded-2xl p-6">
+        <h4 class="font-sub font-bold text-sm text-white mb-4 uppercase tracking-wider flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-gold"></span>
+          Downloads Complementares (Alta Resolução)
+        </h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 font-mono text-xs">
+          <a href="/branding/assets/EBV_Logo_Horizontal_Transparente_4K.png" download="EBV_Logo_Horizontal_Transparente_4K.png" class="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 flex items-center justify-between text-gray-300 hover:text-white transition-all">
+            <span>&bull; Horizontal Transparente (3840px)</span>
+            <span class="text-rose-300 font-bold">&darr; PNG</span>
+          </a>
+          <a href="/branding/assets/EBV_Logo_Monocromatica_Grayscale_4K.png" download="EBV_Logo_Monocromatica_Grayscale_4K.png" class="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 flex items-center justify-between text-gray-300 hover:text-white transition-all">
+            <span>&bull; Monocromática / Grayscale (3840px)</span>
+            <span class="text-silver font-bold">&darr; PNG</span>
+          </a>
+          <a href="/branding/assets/EBV_Logo_Vertical_Master_4K.png" download="EBV_Logo_Vertical_Master_4K.png" class="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 flex items-center justify-between text-gray-300 hover:text-white transition-all">
+            <span>&bull; Vertical Transparente (2800px)</span>
+            <span class="text-gold font-bold">&darr; PNG</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 3: Paleta Cromática Institucional -->
+  <section id="paleta" class="py-16 px-4 sm:px-6 lg:px-8 border-b border-white/10">
+    <div class="max-w-7xl mx-auto space-y-12">
+      <div class="space-y-3">
+        <span class="font-mono text-xs text-ruby font-bold uppercase tracking-widest">03 // Sistema Cromático</span>
+        <h2 class="font-heading text-3xl sm:text-4xl font-bold text-white">Cores Oficiais da Marca</h2>
+        <p class="text-gray-400 text-sm max-w-2xl">
+          Clique em qualquer código HEX para copiar diretamente para a sua área de transferência.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 font-mono text-xs">
+        
+        <!-- Bordô Nobre -->
+        <div onclick="copyHex('#722F37', this)" class="cursor-pointer group bg-[#722f37] text-white p-4 rounded-xl flex flex-col justify-between h-44 font-bold shadow-[0_0_25px_rgba(114,47,55,0.4)] hover:scale-105 transition-all">
+          <div class="flex justify-between items-start">
+            <span class="text-[11px] font-sub">Bordô Nobre</span>
+            <span class="text-[10px] opacity-70 group-hover:opacity-100">📋 Copiar</span>
+          </div>
+          <div>
+            <div class="text-base font-black">#722F37</div>
+            <div class="text-[10px] opacity-90 mt-1">RGB 114, 47, 55<br>CMYK 35, 85, 60, 40<br><span class="opacity-75 font-normal">Cor Primária</span></div>
+          </div>
+        </div>
+
+        <!-- Bordô Profundo -->
+        <div onclick="copyHex('#5C061F', this)" class="cursor-pointer group bg-[#5c061f] text-white p-4 rounded-xl flex flex-col justify-between h-44 font-bold shadow-[0_0_20px_rgba(92,6,31,0.4)] hover:scale-105 transition-all">
+          <div class="flex justify-between items-start">
+            <span class="text-[11px] font-sub">Bordô Escuro</span>
+            <span class="text-[10px] opacity-70 group-hover:opacity-100">📋 Copiar</span>
+          </div>
+          <div>
+            <div class="text-base font-black">#5C061F</div>
+            <div class="text-[10px] opacity-90 mt-1">RGB 92, 6, 31<br>CMYK 35, 100, 75, 55<br><span class="opacity-75 font-normal">Solidez &bull; Hovers</span></div>
+          </div>
+        </div>
+
+        <!-- Ruby Vibrante -->
+        <div onclick="copyHex('#C6273A', this)" class="cursor-pointer group bg-[#c6273a] text-white p-4 rounded-xl flex flex-col justify-between h-44 font-bold shadow-[0_0_20px_rgba(198,39,58,0.4)] hover:scale-105 transition-all">
+          <div class="flex justify-between items-start">
+            <span class="text-[11px] font-sub">Ruby Acolhedor</span>
+            <span class="text-[10px] opacity-70 group-hover:opacity-100">📋 Copiar</span>
+          </div>
+          <div>
+            <div class="text-base font-black">#C6273A</div>
+            <div class="text-[10px] opacity-90 mt-1">RGB 198, 39, 58<br>CMYK 15, 95, 75, 5<br><span class="opacity-75 font-normal">Gradiente da Logo</span></div>
+          </div>
+        </div>
+
+        <!-- Dourado Champagne -->
+        <div onclick="copyHex('#C5A059', this)" class="cursor-pointer group bg-[#c5a059] text-gray-900 p-4 rounded-xl flex flex-col justify-between h-44 font-bold shadow-[0_0_20px_rgba(197,160,89,0.3)] hover:scale-105 transition-all">
+          <div class="flex justify-between items-start">
+            <span class="text-[11px] font-sub">Champagne Gold</span>
+            <span class="text-[10px] opacity-70 group-hover:opacity-100">📋 Copiar</span>
+          </div>
+          <div>
+            <div class="text-base font-black">#C5A059</div>
+            <div class="text-[10px] opacity-90 mt-1">RGB 197, 160, 89<br>CMYK 20, 30, 70, 5<br><span class="opacity-75 font-normal">Detalhes de Luxo</span></div>
+          </div>
+        </div>
+
+        <!-- Prata Titânio -->
+        <div onclick="copyHex('#8E8E93', this)" class="cursor-pointer group bg-[#8e8e93] text-gray-900 p-4 rounded-xl flex flex-col justify-between h-44 font-bold hover:scale-105 transition-all">
+          <div class="flex justify-between items-start">
+            <span class="text-[11px] font-sub">Prata Titânio</span>
+            <span class="text-[10px] opacity-70 group-hover:opacity-100">📋 Copiar</span>
+          </div>
+          <div>
+            <div class="text-base font-black">#8E8E93</div>
+            <div class="text-[10px] opacity-90 mt-1">RGB 142, 142, 147<br>CMYK 45, 35, 35, 5<br><span class="opacity-75 font-normal">Bordas &bull; Metálico</span></div>
+          </div>
+        </div>
+
+        <!-- Grafite Obsidian -->
+        <div onclick="copyHex('#1C1C1E', this)" class="cursor-pointer group bg-[#1c1c1e] text-white p-4 rounded-xl flex flex-col justify-between h-44 font-bold border border-white/20 hover:scale-105 transition-all">
+          <div class="flex justify-between items-start">
+            <span class="text-[11px] font-sub">Grafite Obsidian</span>
+            <span class="text-[10px] opacity-70 group-hover:opacity-100">📋 Copiar</span>
+          </div>
+          <div>
+            <div class="text-base font-black">#1C1C1E</div>
+            <div class="text-[10px] opacity-90 mt-1">RGB 28, 28, 30<br>CMYK 70, 65, 60, 75<br><span class="opacity-75 font-normal">Body Text Nobre</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 4: Tipografia Oficial & Hierarquia -->
+  <section id="tipografia" class="py-16 px-4 sm:px-6 lg:px-8 border-b border-white/10">
+    <div class="max-w-7xl mx-auto space-y-12">
+      <div class="space-y-3">
+        <span class="font-mono text-xs text-gold font-bold uppercase tracking-widest">04 // Tipografia e Escala</span>
+        <h2 class="font-heading text-3xl sm:text-4xl font-bold text-white">Tipografia Oficial da Marca</h2>
+        <p class="text-gray-400 text-sm max-w-2xl">
+          Harmonia e contraste entre a nobreza da serifa clássica de alto padrão e a nitidez digital das fontes sem serifa modernas.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- 1. Playfair Display -->
+        <div class="bg-surface-container border border-white/10 rounded-2xl p-6 space-y-6 flex flex-col justify-between hover:border-gold/30 transition-all">
+          <div class="space-y-4">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+              <span class="font-mono text-xs text-gold uppercase tracking-wider">// Títulos &amp; Destaques</span>
+              <span class="font-mono text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-300">Google Fonts</span>
+            </div>
+            <h3 class="font-heading text-4xl text-white font-bold leading-tight">Playfair Display</h3>
+            <p class="font-heading italic text-xl text-gold">"Onde histórias ganham um novo capítulo."</p>
+            <p class="text-gray-400 text-xs sm:text-sm leading-relaxed">
+              Serifada clássica e imponente com traços de alto contraste. Utilizada nos grandes títulos (Hero), nomes de seções e frases institucionais de autoridade.
+            </p>
+          </div>
+          <div class="pt-4 border-t border-white/10 font-mono text-[11px] text-gray-400 flex justify-between items-center">
+            <span>Pesos: <strong>600, 700, 800</strong></span>
+            <span class="text-gold">H1, H2, Hero Titles</span>
+          </div>
+        </div>
+
+        <!-- 2. Montserrat -->
+        <div class="bg-surface-container border border-white/10 rounded-2xl p-6 space-y-6 flex flex-col justify-between hover:border-ruby/30 transition-all">
+          <div class="space-y-4">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+              <span class="font-mono text-xs text-rose-300 uppercase tracking-wider">// Subtítulos &amp; Menus</span>
+              <span class="font-mono text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-300">Google Fonts</span>
+            </div>
+            <h3 class="font-sub text-3xl text-white font-bold tracking-tight">Montserrat</h3>
+            <p class="font-sub font-semibold text-lg text-rose-300 tracking-wider uppercase">IMÓVEIS SELECIONADOS &bull; CURITIBA</p>
+            <p class="text-gray-400 text-xs sm:text-sm leading-relaxed">
+              Sans-serif geométrica equilibrada, inspirada no design urbano moderno. Utilizada em subtítulos, cabeçalhos de cards de imóveis, botões CTA e itens de navegação.
+            </p>
+          </div>
+          <div class="pt-4 border-t border-white/10 font-mono text-[11px] text-gray-400 flex justify-between items-center">
+            <span>Pesos: <strong>500, 600, 700</strong></span>
+            <span class="text-rose-300">Subtitles, CTAs, Badges</span>
+          </div>
+        </div>
+
+        <!-- 3. Inter -->
+        <div class="bg-surface-container border border-white/10 rounded-2xl p-6 space-y-6 flex flex-col justify-between hover:border-white/20 transition-all">
+          <div class="space-y-4">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+              <span class="font-mono text-xs text-gray-400 uppercase tracking-wider">// Texto Corrido &amp; Dados</span>
+              <span class="font-mono text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-300">Google Fonts</span>
+            </div>
+            <h3 class="font-sans text-3xl text-white font-semibold tracking-normal">Inter</h3>
+            <p class="font-sans text-sm text-gray-300 leading-relaxed">
+              Desenvolvida com métricas perfeitamente calibradas para máxima legibilidade digital em telas de celulares e computadores. Utilizada em descrições de imóveis, formulários e fichas técnicas.
+            </p>
+          </div>
+          <div class="pt-4 border-t border-white/10 font-mono text-[11px] text-gray-400 flex justify-between items-center">
+            <span>Pesos: <strong>400, 500, 600</strong></span>
+            <span class="text-white">Body Text, Specs, Legal</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 5: Aplicações Reais & Mockups -->
+  <section id="mockups" class="py-16 px-4 sm:px-6 lg:px-8 border-b border-white/10">
+    <div class="max-w-7xl mx-auto space-y-12">
+      <div class="space-y-3">
+        <span class="font-mono text-xs text-rose-300 font-bold uppercase tracking-widest">05 // Ambiente Corporativo</span>
+        <h2 class="font-heading text-3xl sm:text-4xl font-bold text-white">Aplicações Reais &amp; Mockups Executivos</h2>
+        <p class="text-gray-400 text-sm max-w-2xl">
+          Visualização fotorrealista da marca oficial aplicada em papelaria imobiliária, cartões de visita executivos, contratos e sinalização de alto padrão.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        
+        <!-- Mockup Papelaria e Dossiê -->
+        <div class="bg-surface-container border border-white/10 rounded-2xl overflow-hidden group shadow-2xl">
+          <div class="overflow-hidden">
+            <img src="/branding/assets/EBV_Mockup_Papelaria_e_Escritorio.jpg" alt="Papelaria e Dossiê Executivo EBV" class="w-full h-80 sm:h-96 object-cover group-hover:scale-105 transition-transform duration-500" />
+          </div>
+          <div class="p-6 space-y-2">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-gold"></span>
+              <h4 class="font-heading font-bold text-white text-xl">Dossiê de Compra &amp; Venda e Cartões Executivos</h4>
+            </div>
+            <p class="text-gray-400 text-xs sm:text-sm leading-relaxed">
+              Pasta de contrato em papel premium grafite com estampagem metálica do brasão, cartões de visita executivos em verniz localizado bordô e papel timbrado institucional com marca d'água elegante.
+            </p>
+          </div>
+        </div>
+
+        <!-- Prancha de Identidade Master -->
+        <div class="bg-surface-container border border-white/10 rounded-2xl overflow-hidden group shadow-2xl">
+          <div class="overflow-hidden bg-[#0e1015] flex items-center justify-center p-6">
+            <img src="/branding/assets/EBV_Prancha_Oficial_Aprovada.png" alt="Prancha Master Oficial Aprovada" class="w-full h-80 sm:h-96 object-contain group-hover:scale-105 transition-transform duration-500" />
+          </div>
+          <div class="p-6 space-y-2">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-primary"></span>
+              <h4 class="font-heading font-bold text-white text-xl">Prancha de Identidade Master (Emblema &bull; Tipografia)</h4>
+            </div>
+            <p class="text-gray-400 text-xs sm:text-sm leading-relaxed">
+              A chave heráldica entrelaçada com as asas de borboleta em gradiente rubi nobre, acompanhada pela assinatura institucional de Edicleia Borba Vieira e CRECI 14269.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 6: Diretrizes de Uso & Boas Práticas (Do's and Don'ts) -->
+  <section class="py-16 px-4 sm:px-6 lg:px-8 border-b border-white/10 bg-surface-container/20">
+    <div class="max-w-7xl mx-auto space-y-12">
+      <div class="space-y-3">
+        <span class="font-mono text-xs text-silver font-bold uppercase tracking-widest">06 // Governança da Marca</span>
+        <h2 class="font-heading text-3xl sm:text-4xl font-bold text-white">Diretrizes de Aplicação &bull; O que Fazer e Não Fazer</h2>
+        <p class="text-gray-400 text-sm max-w-2xl">
+          Regras para preservar a integridade, reconhecimento e alto padrão da marca em qualquer material impresso ou digital.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        
+        <!-- O Que Fazer (Recomendado) -->
+        <div class="bg-surface-container border border-emerald-500/30 rounded-2xl p-6 space-y-4">
+          <div class="flex items-center gap-2 text-emerald-400 font-sub font-bold text-sm uppercase tracking-wider border-b border-white/10 pb-3">
+            <span class="text-base">&check;</span> Práticas Recomendadas
+          </div>
+          <ul class="space-y-3 text-xs sm:text-sm text-gray-300">
+            <li class="flex items-start gap-2.5">
+              <span class="text-emerald-400 font-bold">&bull;</span>
+              <span><strong>Área de Respiro:</strong> Sempre mantenha espaço livre equivalente à largura da chave ao redor da logo completa.</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <span class="text-emerald-400 font-bold">&bull;</span>
+              <span><strong>Contraste Adequado:</strong> Em fundos escuros (preto, grafite, bordô escuro), utilize a versão com tipografia branca/ouro. Em papéis claros, utilize a versão Fundo Claro.</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <span class="text-emerald-400 font-bold">&bull;</span>
+              <span><strong>Proporção 1:1:</strong> Redimensione a imagem sempre pelas pontas com tecla Shift pressionada para não achatar ou esticar o símbolo.</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <span class="text-emerald-400 font-bold">&bull;</span>
+              <span><strong>Registro Profissional:</strong> Em peças de publicidade oficial de imóveis (placas, anúncios, contratos), mantenha sempre visível o CRECI 14269.</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- O Que Não Fazer (Proibido) -->
+        <div class="bg-surface-container border border-rose-500/30 rounded-2xl p-6 space-y-4">
+          <div class="flex items-center gap-2 text-rose-400 font-sub font-bold text-sm uppercase tracking-wider border-b border-white/10 pb-3">
+            <span class="text-base">&cross;</span> Práticas Não Permitidas
+          </div>
+          <ul class="space-y-3 text-xs sm:text-sm text-gray-300">
+            <li class="flex items-start gap-2.5">
+              <span class="text-rose-400 font-bold">&bull;</span>
+              <span><strong>Distorção Geométrica:</strong> Nunca esticar horizontalmente ou achatar verticalmente a logo ou o símbolo.</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <span class="text-rose-400 font-bold">&bull;</span>
+              <span><strong>Alteração de Cores:</strong> Não substituir o bordô original por tons aleatórios de vermelho, rosa choque ou azul.</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <span class="text-rose-400 font-bold">&bull;</span>
+              <span><strong>Fundos Poluídos:</strong> Evitar posicionar a logo transparente diretamente sobre fotos com excesso de elementos visuais sem uma camada de contraste.</span>
+            </li>
+            <li class="flex items-start gap-2.5">
+              <span class="text-rose-400 font-bold">&bull;</span>
+              <span><strong>Efeitos Excessivos:</strong> Não aplicar sombras pesadas, chanfros 3D exagerados ou contornos que descaracterizem a elegância original da marca.</span>
+            </li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 7: Informações Cadastrais (Uso Interno) -->
+  <section class="py-16 px-4 sm:px-6 lg:px-8 border-b border-white/10">
+    <div class="max-w-7xl mx-auto space-y-8">
+      <div class="space-y-3">
+        <span class="font-mono text-xs text-gold font-bold uppercase tracking-widest">07 // Dados Cadastrais</span>
+        <h2 class="font-heading text-3xl sm:text-4xl font-bold text-white">Informações Corporativas &bull; Uso Interno</h2>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 font-mono text-xs">
+        <div class="bg-surface-container border border-white/10 rounded-xl p-5">
+          <span class="text-gray-400 block mb-1">Nome Comercial</span>
+          <span class="text-white text-sm font-bold block">EBV Imóveis</span>
+          <span class="text-gray-500 text-[11px]">Edicleia Borba Vieira</span>
+        </div>
+
+        <div class="bg-surface-container border border-white/10 rounded-xl p-5">
+          <span class="text-gray-400 block mb-1">Registro Profissional</span>
+          <span class="text-gold text-sm font-bold block">CRECI 14269</span>
+          <span class="text-gray-500 text-[11px]">Avaliadora de Imóveis</span>
+        </div>
+
+        <div class="bg-surface-container border border-white/10 rounded-xl p-5">
+          <span class="text-gray-400 block mb-1">Contato Oficial</span>
+          <span class="text-white text-sm font-bold block">(41) 98802-4346</span>
+          <span class="text-gray-500 text-[11px]">contato@ebvimoveiscuritiba.com.br</span>
+        </div>
+
+        <div class="bg-surface-container border border-white/10 rounded-xl p-5">
+          <span class="text-gray-400 block mb-1">Domínio &amp; Região</span>
+          <span class="text-white text-sm font-bold block">ebvimoveiscuritiba.com.br</span>
+          <span class="text-gray-500 text-[11px]">Curitiba e Região &bull; PR</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bg-surface border-t border-white/10 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6 text-xs font-mono text-gray-500">
+      <div class="flex items-center gap-3">
+        <img src="/assets/logo_icon.png" alt="EBV Imóveis" class="w-6 h-6 object-contain" />
+        <span class="text-gray-300 font-bold font-sub">EBV IMÓVEIS &bull; ALTO PADRÃO &bull; CRECI 14269</span>
+      </div>
+      <p>&copy; 2026 EBV Imóveis. Todos os direitos reservados. Manual de Identidade Visual de Uso Interno e Restrito.</p>
+      <a href="/" class="text-gold hover:underline">&larr; Retornar para ebvimoveiscuritiba.com.br</a>
+    </div>
+  </footer>
+
+  <!-- Script for Copying HEX -->
+  <script>
+    function copyHex(hex, el) {
+      navigator.clipboard.writeText(hex).then(() => {
+        const spanEl = el.querySelector('span:last-child');
+        if (spanEl) {
+          const originalText = spanEl.textContent;
+          spanEl.textContent = '✓ Copiado!';
+          setTimeout(() => {
+            spanEl.textContent = originalText;
+          }, 1800);
+        }
+      });
+    }
+  </script>
+
+</body>
+</html>
