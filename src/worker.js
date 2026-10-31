@@ -34,8 +34,6 @@ export default {
         });
       } else if (url.pathname.startsWith("/imovel/")) {
         response = await handlePropertyPage(request, env, url);
-      } else if (url.pathname === "/branding" || url.pathname === "/branding/") {
-        response = await env.ASSETS.fetch(new Request(new URL("/branding/index.html", request.url), request));
       } else {
         response = await env.ASSETS.fetch(request);
       }
