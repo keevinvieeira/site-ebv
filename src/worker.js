@@ -219,10 +219,7 @@ async function handlePropertyPage(request, env, url) {
   const assetResponse = await env.ASSETS.fetch(new Request(new URL("/", url), request));
   let html = await assetResponse.text();
   const title = `${property.title || "Imóvel"} | EBV Imóveis`;
-  const description = String(property.desc || "Imóvel disponível na EBV Imóveis")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 160);
+  const description = propertySummary(property);
   const image = new URL(property.image || "/assets/hero_bg.jpg", `${url.origin}/`).href;
   const canonicalUrl = `${url.origin}${url.pathname}`;
 
@@ -232,7 +229,28 @@ async function handlePropertyPage(request, env, url) {
       /<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i,
       `<meta name="description" content="${escapeAttribute(description)}">`,
     )
-    .replace("</head>", `${propertyMetaTags({ title, description, image, canonicalUrl })}\n</head>`);
+    .replace("</head>", `${propertyMetaTags({ title, description, image, canonicalUrl })}\n${propertyJsonLd(property, { canonicalUrl, image, origin: url.origin })}\n</head>`);
+
+  // Preenche a ficha do imóvel já no HTML do servidor. Antes o HTML saía com os
+  // valores-modelo ("R$ 0,00", "0 m²", "1 / 1") e só o JavaScript corrigia; robôs
+  // (Google, prévia de link do WhatsApp/Facebook, revisão de anúncios da Meta) viam o modelo.
+  const fill = {
+    "modal-title-text": property.title,
+    "modal-location-text": property.location ? `${property.location}, Curitiba` : null,
+    "modal-price-text": formatPrice(property.price),
+    "modal-spec-area": property.area,
+    "modal-spec-beds": property.beds,
+    "modal-spec-baths": property.baths,
+    "modal-spec-vagas": property.vagas,
+    "modal-desc-content": property.desc,
+    "fullscreen-counter": Array.isArray(property.images) && property.images.length ? `1 / ${property.images.length}` : null,
+  };
+  const rewriter = new HTMLRewriter();
+  for (const [elementId, value] of Object.entries(fill)) {
+    if (value === null || value === undefined || value === "") continue;
+    rewriter.on(`#${elementId}`, { element(el) { el.setInnerContent(String(value)); } });
+  }
+  html = await rewriter.transform(new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } })).text();
 
   const headers = new Headers(assetResponse.headers);
   headers.delete("Content-Length");
@@ -240,6 +258,60 @@ async function handlePropertyPage(request, env, url) {
   headers.set("Cache-Control", "public, max-age=300");
   headers.set("Content-Type", "text/html; charset=utf-8");
   return new Response(request.method === "HEAD" ? null : html, { status: 200, headers });
+}
+
+const PRICE_FORMAT = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+function formatPrice(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? PRICE_FORMAT.format(n) : null;
+}
+
+// Resumo para meta description / prévia de link: preço, metragem, quartos, vagas e bairro,
+// seguido do começo da descrição sem os títulos de seção (CARACTERÍSTICAS, DIFERENCIAIS...).
+function propertySummary(property) {
+  const facts = [];
+  const price = formatPrice(property.price);
+  if (price) facts.push(price.replace(/,00$/, ""));
+  if (property.area) facts.push(`${property.area} m²`);
+  if (property.beds) facts.push(`${property.beds} quartos`);
+  if (property.vagas) facts.push(`${property.vagas} vagas`);
+  if (property.location) facts.push(`${property.location}, Curitiba`);
+  const body = String(property.desc || "")
+    .split(/\n+/)
+    .map(line => line.trim())
+    .filter(line => line && !/^[A-ZÀ-Ú\s]{4,}$/.test(line))
+    .join(" ")
+    .replace(/\s+/g, " ");
+  const head = facts.join(" · ");
+  const text = head ? `${head}. ${body}` : (body || "Imóvel disponível na EBV Imóveis");
+  return text.length > 200 ? `${text.slice(0, 197).replace(/\s+\S*$/, "")}...` : text;
+}
+
+function propertyJsonLd(property, { canonicalUrl, image, origin }) {
+  const images = (Array.isArray(property.images) && property.images.length ? property.images : [image])
+    .slice(0, 10)
+    .map(src => new URL(src, `${origin}/`).href);
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "RealEstateListing",
+    name: property.title,
+    url: canonicalUrl,
+    image: images,
+    description: propertySummary(property),
+    offers: Number(property.price) > 0
+      ? { "@type": "Offer", price: Number(property.price), priceCurrency: "BRL", availability: "https://schema.org/InStock" }
+      : undefined,
+    about: {
+      "@type": "SingleFamilyResidence",
+      numberOfRooms: Number(property.beds) || undefined,
+      numberOfBathroomsTotal: Number(property.baths) || undefined,
+      floorSize: Number(property.area) ? { "@type": "QuantitativeValue", value: Number(property.area), unitCode: "MTK" } : undefined,
+      address: { "@type": "PostalAddress", addressLocality: "Curitiba", addressRegion: "PR", addressCountry: "BR", streetAddress: property.location || undefined },
+    },
+  };
+  const json = JSON.stringify(data).replace(/</g, "\\u003c");
+  return `  <script type="application/ld+json">${json}</script>`;
 }
 
 function propertyMetaTags({ title, description, image, canonicalUrl }) {
