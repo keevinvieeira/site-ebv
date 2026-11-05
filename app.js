@@ -539,11 +539,12 @@ function checkLogin() {
 }
 
 // LGPD Consent Banner Logic
+// Pixel da Meta fica ligado por padrão; o aviso aparece até a pessoa escolher.
+// "Recusar" grava "false" no localStorage e desliga o Pixel (ver tracking.js).
 function checkLgpdConsent() {
   const consent = localStorage.getItem("ebv_lgpd_consent");
-  const rejected = sessionStorage.getItem("ebv_lgpd_rejected");
   const banner = document.getElementById("lgpd-banner");
-  if (!consent && !rejected && banner) {
+  if (!consent && banner) {
     setTimeout(() => {
       banner.classList.add("is-visible");
     }, 1500); // Premium delay slide-in
@@ -557,9 +558,16 @@ function acceptLgpdConsent() {
 }
 
 function rejectLgpdConsent() {
-  sessionStorage.setItem("ebv_lgpd_rejected", "true");
+  localStorage.setItem("ebv_lgpd_consent", "false");
+  if (window.EBVTracking && window.EBVTracking.revokePixel) window.EBVTracking.revokePixel();
   const banner = document.getElementById("lgpd-banner");
   if (banner) banner.classList.remove("is-visible");
+}
+
+// Reabre o aviso para a pessoa mudar a escolha (link na Política de Privacidade).
+function openCookiePreferences() {
+  const banner = document.getElementById("lgpd-banner");
+  if (banner) banner.classList.add("is-visible");
 }
 
 function openLoginModal(pageId) {

@@ -1,6 +1,7 @@
 // EBV Imóveis - Captação de leads + Meta Pixel
 // - Guarda a origem da visita (UTMs, fbclid) para atribuir o lead à campanha.
-// - Carrega o Pixel da Meta só depois do aceite de cookies (LGPD).
+// - Carrega o Pixel da Meta por padrão; se a pessoa clicar em "Recusar" no aviso de
+//   cookies (LGPD), o Pixel é desligado e a recusa fica salva neste navegador.
 // - Antes de abrir o WhatsApp, pede nome e telefone e registra o lead no CRM.
 (function () {
   "use strict";
@@ -54,6 +55,10 @@
   function collect() {
     const a = readJSON(STORE_KEY) || {};
     const out = { ...a, pageUrl: window.location.href.slice(0, 1000) };
+    if (!hasConsent()) {
+      delete out.fbc;
+      return out;
+    }
     const fbc = readCookie("_fbc");
     const fbp = readCookie("_fbp");
     if (fbc) out.fbc = fbc;
@@ -67,8 +72,25 @@
   }
 
   // ---------- Pixel ----------
+  // Sem escolha registrada = Pixel ligado (opt-out). Só "false" (recusou) desliga.
   function hasConsent() {
-    return getLS(CONSENT_KEY) === "true";
+    return getLS(CONSENT_KEY) !== "false";
+  }
+
+  function expireCookie(name) {
+    const host = window.location.hostname.replace(/^www\./, "");
+    [`; domain=.${host}`, ""].forEach(d => {
+      document.cookie = `${name}=; Max-Age=0; path=/${d}`;
+    });
+  }
+
+  // Chamado quando a pessoa recusa: revoga o Pixel já carregado e apaga os cookies dele.
+  function revokePixel() {
+    if (typeof window.fbq === "function") {
+      try { window.fbq("consent", "revoke"); } catch { /* ignore */ }
+    }
+    pixelLoaded = false;
+    ["_fbp", "_fbc"].forEach(expireCookie);
   }
 
   function loadPixel() {
@@ -89,7 +111,7 @@
   }
 
   function track(eventName, params, eventId) {
-    if (!pixelLoaded || typeof window.fbq !== "function") return;
+    if (!pixelLoaded || !hasConsent() || typeof window.fbq !== "function") return;
     const standard = ["PageView", "ViewContent", "Lead", "Contact", "Schedule", "Search"];
     const method = standard.includes(eventName) ? "track" : "trackCustom";
     window.fbq(method, eventName, params || {}, eventId ? { eventID: eventId } : undefined);
@@ -311,13 +333,13 @@
     openModal(contextFor(link));
   }, true);
 
-  // Liga o Pixel assim que a pessoa aceitar os cookies.
+  // Se a pessoa aceitar depois de ter recusado, liga o Pixel de novo.
   document.addEventListener("click", e => {
     const btn = e.target.closest && e.target.closest('#lgpd-banner button');
     if (btn) setTimeout(loadPixel, 0);
   });
 
-  window.EBVTracking = { collect, newEventId, track, viewContent, loadPixel, getViewed };
+  window.EBVTracking = { collect, newEventId, track, viewContent, loadPixel, revokePixel, getViewed };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);
