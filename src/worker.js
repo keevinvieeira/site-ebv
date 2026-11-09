@@ -818,3 +818,80 @@ function addSecurityHeaders(response) {
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) headers.set(name, value);
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
+
+
+async function generateSitemap(env, origin) {
+  const today = new Date().toISOString().split("T")[0];
+  let propertyUrls = "";
+
+  try {
+    const { results } = await env.DB.prepare("SELECT id FROM properties").all();
+    if (results && results.length) {
+      for (const row of results) {
+        propertyUrls += `  <url>
+    <loc>${origin}/imovel/${encodeURIComponent(row.id)}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>\n`;
+      }
+    }
+  } catch (err) {
+    console.warn("Sitemap properties fetch warning:", err);
+  }
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Paginas Principais -->
+  <url>
+    <loc>${origin}/</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>${origin}/#imoveis</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>${origin}/#avaliacao</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${origin}/#sobre</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>${origin}/#privacidade</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>${origin}/#termos</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <!-- Imoveis Ativos (SSR) -->
+${propertyUrls}</urlset>`;
+}
+
+function generateRobots(origin) {
+  return `User-agent: *
+Allow: /
+
+# Diretorios restritos e internos
+Disallow: /api/
+Disallow: /branding
+Disallow: /branding/
+
+Sitemap: ${origin}/sitemap.xml
+`;
+}
