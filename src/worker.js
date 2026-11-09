@@ -32,6 +32,14 @@ export default {
         response = new Response(await catalogCsv(env, url.origin), {
           headers: { "Content-Type": "text/csv; charset=utf-8", "Cache-Control": "public, max-age=900" },
         });
+      } else if (url.pathname === "/sitemap.xml") {
+        response = new Response(await generateSitemap(env, url.origin), {
+          headers: { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "public, max-age=3600" },
+        });
+      } else if (url.pathname === "/robots.txt") {
+        response = new Response(generateRobots(url.origin), {
+          headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=86400" },
+        });
       } else if (url.pathname.startsWith("/imovel/")) {
         response = await handlePropertyPage(request, env, url);
       } else {

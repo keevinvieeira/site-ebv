@@ -2261,3 +2261,59 @@ footer {
     padding: 10px 0;
   }
 }
+
+
+/* Floating WhatsApp Button */
+.floating-whatsapp-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 60px;
+  height: 60px;
+  background: #25D366;
+  color: #FFFFFF;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(37, 211, 102, 0.4);
+  z-index: 999;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+  text-decoration: none;
+  animation: pulse-wa 2.5s infinite;
+}
+
+.floating-whatsapp-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 8px 30px rgba(37, 211, 102, 0.6);
+  color: #FFFFFF;
+}
+
+.floating-whatsapp-btn svg {
+  width: 32px;
+  height: 32px;
+  fill: currentColor;
+}
+
+@keyframes pulse-wa {
+  0% {
+    box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 16px rgba(37, 211, 102, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(37, 211, 102, 0);
+  }
+}
+
+.footer-contact-link {
+  color: var(--light-gray);
+  text-decoration: none;
+  transition: var(--transition-smooth);
+}
+
+.footer-contact-link:hover {
+  color: var(--bg-clean);
+  text-decoration: underline;
+}

@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Diretórios restritos e internos
+Disallow: /api/
+Disallow: /branding
+Disallow: /branding/
+
+Sitemap: https://ebvimoveiscuritiba.com.br/sitemap.xml
