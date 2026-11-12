@@ -38,7 +38,15 @@ export async function attachLeadToContact(env, input) {
 
 export async function afterLeadSaved(env, ctx, { contactId, leadId, ref, isNew, input }) {
   const now = new Date().toISOString();
-  const what = input.propertyTitle ? `Interesse em: ${input.propertyTitle}` : input.kind === "avaliacao" ? "Pediu avaliação de imóvel" : "Chamou no WhatsApp pelo site";
+  const extra = input.extra || {};
+  const byInterest = {
+    comprar: "Quer comprar, ainda sem imóvel escolhido (WhatsApp pelo site)",
+    vender: "Quer vender o imóvel (WhatsApp pelo site)",
+    avaliar: "Quer avaliar o imóvel (WhatsApp pelo site)",
+  };
+  const what = input.propertyTitle ? `Interesse em: ${input.propertyTitle}`
+    : input.kind === "avaliacao" ? "Pediu avaliação de imóvel"
+    : byInterest[extra.interest] || "Chamou no WhatsApp pelo site";
   await addActivity(env, {
     contactId,
     leadId,
@@ -47,6 +55,8 @@ export async function afterLeadSaved(env, ctx, { contactId, leadId, ref, isNew, 
     data: {
       ref,
       origin: input.origin || null,
+      interest: extra.interest || null,
+      cta: extra.cta || null,
       propertyId: input.propertyId || null,
       viewed: Array.isArray(input.viewed) ? input.viewed.slice(0, 20) : [],
     },
@@ -74,6 +84,7 @@ export async function afterLeadSaved(env, ctx, { contactId, leadId, ref, isNew, 
       input.email ? `E-mail: ${input.email}` : null,
       what,
       input.origin ? `Origem: ${input.origin}` : null,
+      extra.cta ? `Botão do site: ${extra.cta}` : null,
       `Código: ${ref}`,
     ],
   }));

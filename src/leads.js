@@ -37,7 +37,7 @@ export async function postLead(request, env, ctx, body) {
     value: v.value.value,
     tracking: v.value.tracking,
     viewed: v.value.viewed,
-    extra: { context: v.value.context },
+    extra: { context: v.value.context, interest: v.value.interest, cta: v.value.cta },
   });
   return { status: 201, body: { id: lead.id, ref: lead.ref, eventId: lead.eventId, duplicate: lead.duplicate === true } };
 }
@@ -391,6 +391,8 @@ async function buildEvent(lead, { eventName, eventId, actionSource }) {
     customData.content_type = "product";
   }
   if (lead.property_title) customData.content_name = lead.property_title;
+  if (lead.data && lead.data.interest) customData.interest = lead.data.interest;
+  if (lead.data && lead.data.cta) customData.cta = lead.data.cta;
   // Valor só no fechamento, para não inflar o retorno com preço de imóvel em leads.
   if (eventName === "Purchase" && lead.value != null) customData.value = Number(lead.value);
 
@@ -416,6 +418,8 @@ function validateLeadInput(value) {
 
   const leadType = value.leadType === "proprietario" ? "proprietario" : "comprador";
   const context = typeof value.context === "string" ? value.context.slice(0, 40) : "geral";
+  const interest = ["comprar", "vender", "avaliar"].includes(value.interest) ? value.interest : null;
+  const cta = typeof value.cta === "string" && /^[a-z0-9-]{1,40}$/.test(value.cta) ? value.cta : null;
   const propertyId = typeof value.propertyId === "string" && value.propertyId.length <= 200 ? value.propertyId : null;
   const propertyTitle = typeof value.propertyTitle === "string" ? value.propertyTitle.slice(0, 200) : null;
   const num = Number(value.value);
@@ -423,7 +427,7 @@ function validateLeadInput(value) {
 
   return {
     value: {
-      name, phone, leadType, context, propertyId, propertyTitle, value: leadValue,
+      name, phone, leadType, context, interest, cta, propertyId, propertyTitle, value: leadValue,
       tracking: sanitizeTracking(value.tracking),
       viewed: Array.isArray(value.viewed) ? value.viewed.filter(x => typeof x === "string" && x.length <= 200).slice(0, 20) : [],
     },

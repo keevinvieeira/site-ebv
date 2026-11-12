@@ -135,6 +135,7 @@ let currentFormImages = [];       // Dynamic images list for admin property form
 const DEFAULT_PAGE_TITLE = document.title;
 let leads = [];
 window.ebvActiveProperty = () => properties.find(p => p.id === activeModalPropertyId) || null;
+window.ebvProperties = () => properties.slice();
 
 // Initialize Application
 document.addEventListener("DOMContentLoaded", async () => {
@@ -1175,8 +1176,14 @@ window.addEventListener("click", (e) => {
 async function submitAppraisal(event) {
   event.preventDefault();
 
-  const name = document.getElementById("ap-name").value;
+  const name = document.getElementById("ap-name").value.trim().replace(/\s+/g, " ");
   const phone = document.getElementById("ap-phone").value;
+  const nameWords = name.split(" ").filter(w => w.replace(/[^\p{L}]/gu, "").length >= 2);
+  if (nameWords.length < 2) {
+    alert("Informe seu nome completo (nome e sobrenome).");
+    document.getElementById("ap-name").focus();
+    return;
+  }
   const email = document.getElementById("ap-email").value;
   const type = document.getElementById("ap-type").value;
   const area = document.getElementById("ap-area").value || "Não informado";
