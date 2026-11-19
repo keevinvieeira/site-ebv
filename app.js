@@ -132,24 +132,27 @@ let currentModalPhotoIndex = 0;
 let activeModalPropertyId = null; // Global tracker for currently viewed property
 let editingPropertyId = null;     // Global tracker for currently edited property
 let currentFormImages = [];       // Dynamic images list for admin property form
-const DEFAULT_PAGE_TITLE = document.title;
+const DEFAULT_PAGE_TITLE = window.__EBV_INITIAL_PROPERTY__
+  ? "EBV Imóveis | Corretora em Curitiba - Imóveis de Alto Padrão"
+  : document.title;
 let leads = [];
-window.ebvActiveProperty = () => properties.find(p => p.id === activeModalPropertyId) || null;
+window.ebvActiveProperty = () => properties.find(p => p.id === activeModalPropertyId)
+  || (window.__EBV_INITIAL_PROPERTY__ && window.__EBV_INITIAL_PROPERTY__.id === activeModalPropertyId ? window.__EBV_INITIAL_PROPERTY__ : null);
 window.ebvProperties = () => properties.slice();
 
 // Initialize Application
 document.addEventListener("DOMContentLoaded", async () => {
-  await loadStateAsync();
-  await restoreAdminSession();
-  renderFeaturedProperties();
-  renderCatalogProperties();
-  populateSearchFilters();
   checkLgpdConsent();
-  updateAdminDashboard();
   setupScrollEffects();
-  renderAdminPhotoGallery();
-  handleLocationRoute();
-  
+
+  // Hidratação instantânea em URLs /imovel/:id sem esperar /api/properties ou /api/admin/session
+  const initialProp = window.__EBV_INITIAL_PROPERTY__;
+  const initialHandled = Boolean(initialProp && initialProp.id && propertyIdFromPath() === initialProp.id);
+  if (initialHandled) {
+    properties = [initialProp];
+    handleLocationRoute();
+  }
+
   // Close fullscreen viewer when clicking overlay background
   const fViewer = document.getElementById("fullscreen-viewer");
   if (fViewer) {
@@ -158,6 +161,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         closeFullscreenViewer();
       }
     });
+  }
+
+  await Promise.all([loadStateAsync(), restoreAdminSession()]);
+  renderFeaturedProperties();
+  renderCatalogProperties();
+  populateSearchFilters();
+  updateAdminDashboard();
+  renderAdminPhotoGallery();
+  if (!initialHandled) {
+    handleLocationRoute();
   }
 });
 

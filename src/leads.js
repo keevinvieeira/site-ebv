@@ -259,10 +259,18 @@ async function saveLead(request, env, ctx, input) {
 
   const id = crypto.randomUUID();
   const eventId = input.tracking.eventId || `lead:${id}`;
+  const cookieFbc = readRequestCookie(request, "_fbc");
+  const cookieFbp = readRequestCookie(request, "_fbp");
+  const resolvedFbc = input.tracking.fbc
+    || cookieFbc
+    || (input.tracking.fbclid ? `fb.1.${now.getTime()}.${input.tracking.fbclid}` : null);
+  const resolvedFbp = input.tracking.fbp || cookieFbp || null;
   const data = {
     eventId,
     tracking: {
       ...input.tracking,
+      ...(resolvedFbc ? { fbc: resolvedFbc } : {}),
+      ...(resolvedFbp ? { fbp: resolvedFbp } : {}),
       clientIp: request.headers.get("CF-Connecting-IP") || null,
       userAgent: (request.headers.get("User-Agent") || "").slice(0, 500) || null,
     },
@@ -445,6 +453,19 @@ function sanitizeTracking(t) {
     if (typeof t[k] === "string" && t[k].trim()) out[k] = t[k].trim().slice(0, max);
   }
   return out;
+}
+
+function readRequestCookie(request, name) {
+  const header = request && request.headers && request.headers.get("Cookie");
+  if (!header) return null;
+  const match = header.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  if (!match) return null;
+  try {
+    const val = decodeURIComponent(match[1]).trim();
+    return val ? val.slice(0, 500) : null;
+  } catch {
+    return null;
+  }
 }
 
 function normalizePhone(digits) {

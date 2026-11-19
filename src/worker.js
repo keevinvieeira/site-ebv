@@ -228,32 +228,84 @@ async function handlePropertyPage(request, env, url) {
   let html = await assetResponse.text();
   const title = `${property.title || "Imóvel"} | EBV Imóveis`;
   const description = propertySummary(property);
-  const image = new URL(property.image || "/assets/hero_bg.jpg", `${url.origin}/`).href;
+  const mainImagePath = property.image || (Array.isArray(property.images) && property.images[0]) || "/assets/hero_bg.jpg";
+  const image = new URL(mainImagePath, `${url.origin}/`).href;
   const canonicalUrl = `${url.origin}${url.pathname}`;
+  const bootstrapJson = JSON.stringify(property)
+    .replace(/</g, "\\u003c")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+  const pixelJson = JSON.stringify(env.META_PIXEL_ID || null);
+  const bootstrapScript = `  <script>window.__EBV_INITIAL_PROPERTY__=${bootstrapJson};window.__EBV_META_PIXEL_ID__=${pixelJson};</script>`;
 
   html = html
+    .replace(
+      /<link\s+rel="preload"\s+as="image"\s+href="assets\/hero_bg\.jpg"[^>]*>/i,
+      `<link rel="preload" as="image" href="${escapeAttribute(mainImagePath)}" fetchpriority="high">`,
+    )
     .replace(/<title>[^<]*<\/title>/i, `<title>${escapeAttribute(title)}</title>`)
     .replace(
       /<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i,
       `<meta name="description" content="${escapeAttribute(description)}">`,
     )
-    .replace("</head>", `${propertyMetaTags({ title, description, image, canonicalUrl })}\n${propertyJsonLd(property, { canonicalUrl, image, origin: url.origin })}\n</head>`);
+    .replace("</head>", `${propertyMetaTags({ title, description, image, canonicalUrl })}\n${propertyJsonLd(property, { canonicalUrl, image, origin: url.origin })}\n${bootstrapScript}\n</head>`);
 
-  // Preenche a ficha do imóvel já no HTML do servidor. Antes o HTML saía com os
-  // valores-modelo ("R$ 0,00", "0 m²", "1 / 1") e só o JavaScript corrigia; robôs
-  // (Google, prévia de link do WhatsApp/Facebook, revisão de anúncios da Meta) viam o modelo.
+  // Renderiza a página do imóvel já aberta no HTML do servidor (sem flash da home atrás
+  // e sem valores-modelo "R$ 0,00" / "0 m²" antes do JavaScript hidratar).
+  const priceText = formatPrice(property.price);
+  const waText = encodeURIComponent(`Olá Edicleia! Tenho interesse no imóvel "${property.title || "Imóvel"}"${priceText ? ` (${priceText})` : ""} que vi no seu site EBV Imóveis. Gostaria de receber mais informações.`);
   const fill = {
+    "modal-badge-status": "COMPRA E VENDA",
     "modal-title-text": property.title,
     "modal-location-text": property.location ? `${property.location}, Curitiba` : null,
-    "modal-price-text": formatPrice(property.price),
+    "modal-price-text": priceText,
     "modal-spec-area": property.area,
     "modal-spec-beds": property.beds,
     "modal-spec-baths": property.baths,
-    "modal-spec-vagas": property.vagas,
+    "modal-spec-vagas": property.vagas ?? "0",
     "modal-desc-content": property.desc,
     "fullscreen-counter": Array.isArray(property.images) && property.images.length ? `1 / ${property.images.length}` : null,
   };
-  const rewriter = new HTMLRewriter();
+  const rewriter = new HTMLRewriter()
+    .on("body", {
+      element(el) {
+        const cls = el.getAttribute("class") || "";
+        el.setAttribute("class", cls ? `${cls} property-page-open` : "property-page-open");
+      },
+    })
+    .on("#property-modal", {
+      element(el) {
+        const cls = el.getAttribute("class") || "modal-overlay";
+        if (!cls.split(/\s+/).includes("property-page")) el.setAttribute("class", `${cls} property-page`);
+        el.setAttribute("style", "display: flex;");
+      },
+    })
+    .on("#modal-image", {
+      element(el) {
+        el.setAttribute("src", mainImagePath);
+        if (property.title) el.setAttribute("alt", String(property.title));
+      },
+    })
+    .on("#modal-badge-status", {
+      element(el) {
+        el.setAttribute("class", "property-badge-status badge-venda");
+      },
+    })
+    .on("#modal-whatsapp-link", {
+      element(el) {
+        el.setAttribute("href", `https://wa.me/5541988024346?text=${waText}`);
+      },
+    })
+    .on("#modal-map-container", {
+      element(el) {
+        if (!property.address) el.setAttribute("style", "display: none;");
+      },
+    })
+    .on("#modal-address-text span", {
+      element(el) {
+        if (property.address) el.setInnerContent(`Endereço: ${property.address}`);
+      },
+    });
   for (const [elementId, value] of Object.entries(fill)) {
     if (value === null || value === undefined || value === "") continue;
     rewriter.on(`#${elementId}`, { element(el) { el.setInnerContent(String(value)); } });

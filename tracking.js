@@ -11,6 +11,7 @@
   const CONSENT_KEY = "ebv_lgpd_consent";
   let pixelId = null;
   let pixelLoaded = false;
+  const pendingTracks = [];
 
   // ---------- storage seguro ----------
   function getLS(key) {
@@ -26,6 +27,12 @@
     const m = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
     return m ? decodeURIComponent(m[1]) : null;
   }
+  function writeCookie(name, value, maxAgeSeconds) {
+    try {
+      const secure = window.location.protocol === "https:" ? "; Secure" : "";
+      document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=${maxAgeSeconds}; path=/; SameSite=Lax${secure}`;
+    } catch { /* ignore */ }
+  }
 
   // ---------- atribuição ----------
   function captureAttribution() {
@@ -37,11 +44,21 @@
       if (v) fresh[k] = v.slice(0, 500);
     });
 
-    // Um novo clique de anúncio substitui a atribuição anterior (last click pago).
+    // Um novo clique de anúncio substitui a atribuição anterior (last click pago),
+    // mas preserva fbclid/fbc já capturados se o novo clique trouxer apenas UTMs sem fbclid.
     if (Object.keys(fresh).length) {
       const next = { ...fresh, landingPage: window.location.href.slice(0, 1000), firstSeen: new Date().toISOString() };
       if (document.referrer) next.referrer = document.referrer.slice(0, 1000);
-      if (fresh.fbclid) next.fbc = `fb.1.${Date.now()}.${fresh.fbclid}`;
+      if (fresh.fbclid) {
+        const existingCookieFbc = readCookie("_fbc");
+        next.fbc = existingCookieFbc && existingCookieFbc.endsWith(`.${fresh.fbclid}`)
+          ? existingCookieFbc
+          : `fb.1.${Date.now()}.${fresh.fbclid}`;
+        if (hasConsent()) writeCookie("_fbc", next.fbc, 90 * 24 * 60 * 60);
+      } else {
+        if (current.fbclid) next.fbclid = current.fbclid;
+        if (current.fbc) next.fbc = current.fbc;
+      }
       setLS(STORE_KEY, JSON.stringify(next));
       return;
     }
@@ -90,6 +107,7 @@
       try { window.fbq("consent", "revoke"); } catch { /* ignore */ }
     }
     pixelLoaded = false;
+    pendingTracks.length = 0;
     ["_fbp", "_fbc"].forEach(expireCookie);
   }
 
@@ -108,10 +126,18 @@
     if (saved && saved.phone) advanced.ph = normalizePhone(saved.phone);
     window.fbq("init", pixelId, advanced);
     window.fbq("track", "PageView");
+    while (pendingTracks.length) {
+      const item = pendingTracks.shift();
+      track(item.eventName, item.params, item.eventId);
+    }
   }
 
   function track(eventName, params, eventId) {
-    if (!pixelLoaded || !hasConsent() || typeof window.fbq !== "function") return;
+    if (!hasConsent()) return;
+    if (!pixelLoaded || typeof window.fbq !== "function") {
+      if (pendingTracks.length < 20) pendingTracks.push({ eventName, params, eventId });
+      return;
+    }
     const standard = ["PageView", "ViewContent", "Lead", "Contact", "Schedule", "Search"];
     const method = standard.includes(eventName) ? "track" : "trackCustom";
     window.fbq(method, eventName, params || {}, eventId ? { eventID: eventId } : undefined);
@@ -124,6 +150,11 @@
 
   async function init() {
     captureAttribution();
+    if (typeof window.__EBV_META_PIXEL_ID__ === "string" && window.__EBV_META_PIXEL_ID__) {
+      pixelId = window.__EBV_META_PIXEL_ID__;
+      loadPixel();
+      return;
+    }
     try {
       const res = await fetch("/api/config", { credentials: "same-origin" });
       const cfg = res.ok ? await res.json() : {};
