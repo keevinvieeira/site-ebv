@@ -14,6 +14,10 @@ src/
 src/**
 migrations/
 migrations/**
+ebv-direct/
+ebv-direct/**
+sdr/
+sdr/**
 .env
 .env.*
 .gitignore

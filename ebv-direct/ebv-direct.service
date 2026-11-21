@@ -1,0 +1,18 @@
+[Unit]
+Description=EBV Instagram Direct pela assinatura ChatGPT
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/deploy/.hermes/profiles/ebv
+Environment=HERMES_HOME=/home/deploy/.hermes/profiles/ebv
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /home/deploy/.hermes/profiles/ebv/direct_loop.py
+Restart=always
+RestartSec=8
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+[Install]
+WantedBy=default.target
