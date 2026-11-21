@@ -1,5 +1,5 @@
-import { postLead, leadFromAppraisal, listLeads, updateLead, deleteLead, importLeads, audienceCsv, createManualLead } from "./leads.js";
-import { handleCrmAdmin, handleAgentApi, afterPropertiesSaved, catalogCsv } from "./crm.js";
+import { postLead, leadFromAppraisal, listLeads, updateLead, deleteLead, importLeads, audienceCsv, createManualLead, saveDirectLead } from "./leads.js";
+import { handleCrmAdmin, handleAgentApi, handleInstagramWebhook, pollInstagram, afterPropertiesSaved, catalogCsv } from "./crm.js";
 
 const SESSION_COOKIE = "ebv_session";
 const SESSION_TTL_SECONDS = 8 * 60 * 60;
@@ -61,6 +61,10 @@ export default {
       }));
     }
   },
+
+  async scheduled(_event, env, ctx) {
+    ctx.waitUntil(pollInstagram(env, { createManualLead }).catch(err => console.error("ig poll", err)));
+  },
 };
 
 async function handleApi(request, env, url, ctx) {
@@ -115,8 +119,21 @@ async function handleApi(request, env, url, ctx) {
     return response || jsonError(404, "not_found", "Rota não encontrada.");
   }
 
+  if (path === "/api/instagram/webhook") {
+    return handleInstagramWebhook(request, env, { createManualLead });
+  }
+
+  if (path === "/api/instagram/poll") {
+    if (method !== "POST") return methodNotAllowed(["POST"]);
+    const auth = request.headers.get("Authorization") || "";
+    if (!env.EBV_IG_VERIFY_TOKEN || auth !== `Bearer ${env.EBV_IG_VERIFY_TOKEN}`) {
+      return jsonError(401, "unauthorized", "Token inválido.");
+    }
+    return jsonResponse(await pollInstagram(env, { createManualLead }));
+  }
+
   if (path.startsWith("/api/agent/")) {
-    return handleAgentApi(request, env, ctx, path, method, () => readJson(request, 64 * 1024), { createManualLead, updateLead });
+    return handleAgentApi(request, env, ctx, path, method, () => readJson(request, 64 * 1024), { createManualLead, updateLead, saveDirectLead });
   }
 
   if (path === "/api/admin/leads/import") {

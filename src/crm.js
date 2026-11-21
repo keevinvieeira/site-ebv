@@ -1,6 +1,10 @@
 // CRM da EBV: contatos, perfil de busca, tarefas, linha do tempo, match de imóveis,
 // avisos de lead novo e API para automação (agente de WhatsApp).
 import { ensureSchema, upsertContactRow, canonicalPhone, safeJson } from "./schema.js";
+import {
+  followUpPlan, fullName, qualifyTurn, extractInstagramDirect, keepForAccount, verifyMetaSignature,
+  DIRECT_AGENT_SINCE, sanitizeCustomerReply, shouldAutoReplyDirect, directAgentPrompt, publicPropertyFact,
+} from "./sdr.js";
 
 const OPEN_STAGES = ["novo", "contatado", "qualificado", "visita", "proposta"];
 const PROFILE_FIELDS = {
@@ -13,6 +17,8 @@ const PROFILE_FIELDS = {
   pagamento: "text",    // financiamento, à vista, FGTS, permuta
   prazo: "text",        // imediato, 3 meses, 6 meses, sem pressa
   obs: "text",
+  finalidade: "text",   // comprar, vender, avaliar
+  visita: "text",
 };
 
 // ---------- Ganchos chamados pela captação de leads ----------
@@ -232,6 +238,23 @@ export async function handleCrmAdmin(request, env, ctx, path, method, readBody, 
       .filter(x => x.score > 0).sort((a, b) => b.score - a.score));
   }
 
+  if (path === "/api/admin/crm/atendimento" && method === "GET") {
+    return ok(await listAtendimento(env));
+  }
+
+  m = path.match(/^\/api\/admin\/crm\/conversations\/([^/]+)\/(assumir|pausar|retomar)$/);
+  if (m && method === "POST") {
+    const status = { assumir: "humano", pausar: "pausada", retomar: "ia" }[m[2]];
+    const saved = await setConversationStatus(env, decodeURIComponent(m[1]), status);
+    return saved ? ok({ ok: true, status }) : notFound();
+  }
+
+  m = path.match(/^\/api\/admin\/crm\/visits\/([^/]+)\/(aprovar|recusar)$/);
+  if (m && method === "POST") {
+    const saved = await decideVisit(env, decodeURIComponent(m[1]), m[2] === "aprovar" ? "aprovada" : "recusada");
+    return saved ? ok({ ok: true }) : notFound();
+  }
+
   return null;
 }
 
@@ -280,10 +303,578 @@ export async function handleAgentApi(request, env, ctx, path, method, readBody, 
     return ok(await contactDetail(env, contactId));
   }
 
+  if (path === "/api/agent/inbound" && method === "POST") {
+    const body = await readBody();
+    if (body.error) return body.error;
+    const result = await ingestSdrInbound(env, body.value || {}, helpers);
+    if (result.error) return bad(result.error);
+    return ok(result);
+  }
+
+  if (path === "/api/agent/direct-lead" && method === "POST") {
+    const body = await readBody();
+    if (body.error) return body.error;
+    const b = body.value || {};
+    const externalId = str(b.externalId, 80);
+    if (!externalId) return bad("Informe externalId.");
+
+    const rawPhone = canonicalPhone(b.phone);
+    const goalRaw = str(b.goal, 40).toLowerCase();
+    const goal = goalRaw || "comprar";
+    const leadType = goal === "vender" || goal === "avaliar" || goal === "proprietario" ? "proprietario" : "comprador";
+    const name = str(b.name, 120) || "Contato Instagram";
+    const budgetFit = str(b.budgetFit, 200);
+    const propertyId = str(b.propertyId, 200) || null;
+    const propertyTitle = str(b.propertyTitle, 200) || null;
+    const adTitle = str(b.adTitle, 200) || "";
+    const summary = str(b.summary, 2000) || "";
+    const now = new Date().toISOString();
+
+    let conv = await env.DB.prepare(
+      "SELECT * FROM sdr_conversations WHERE channel = 'instagram' AND external_id = ?",
+    ).bind(externalId).first();
+
+    if (conv && conv.contact_id && rawPhone) {
+      const clash = await env.DB.prepare("SELECT id FROM contacts WHERE phone = ? AND id != ?").bind(rawPhone, conv.contact_id).first();
+      if (!clash) {
+        await env.DB.prepare("UPDATE contacts SET phone = COALESCE(phone, ?), updated_at = ? WHERE id = ?")
+          .bind(rawPhone, now, conv.contact_id).run();
+      }
+    }
+
+    let contactId = conv ? conv.contact_id : null;
+    let openLead = null;
+    if (rawPhone) {
+      const attached = await attachLeadToContact(env, { name, phone: rawPhone, email: null, leadType, kind: "instagram" });
+      contactId = attached.contactId;
+      openLead = attached.openLead;
+    } else if (!contactId) {
+      contactId = await upsertContactRow(env, { name, phone: null, email: null, role: leadType, source: "instagram" });
+    }
+    if (!openLead && contactId) {
+      const open = await env.DB.prepare(
+        `SELECT id, ref, data FROM leads WHERE contact_id = ? AND lead_type = ? AND stage IN (${OPEN_STAGES.map(() => "?").join(",")})
+          ORDER BY created_at DESC LIMIT 1`,
+      ).bind(contactId, leadType, ...OPEN_STAGES).first();
+      if (open) openLead = { id: open.id, ref: open.ref, eventId: safeJson(open.data).eventId };
+    }
+
+    if (name && name !== "Contato Instagram") {
+      await env.DB.prepare(
+        "UPDATE contacts SET name = ? WHERE id = ? AND (name = '' OR name = 'Sem nome' OR name = 'Contato do atendimento' OR name = 'Contato Instagram' OR name NOT LIKE '% %')",
+      ).bind(name, contactId).run();
+    }
+
+    const profilePatch = {
+      finalidade: leadType === "proprietario" ? (goal === "avaliar" ? "avaliar" : "vender") : "comprar",
+      obs: [goal ? `Objetivo: ${goal}` : "", budgetFit ? `Valor: ${budgetFit}` : ""].filter(Boolean).join(" | ") || null,
+    };
+    if (propertyId) {
+      const prop = await getProperty(env, propertyId);
+      if (prop && prop.location) profilePatch.bairros = [prop.location];
+    }
+    await updateContact(env, contactId, { profile: profilePatch });
+
+    const qual = {
+      ...(conv ? safeJson(conv.qualificacao, {}) : {}),
+      name,
+      phone: rawPhone || "",
+      goal,
+      budgetFit,
+      propertyId,
+      propertyTitle,
+      adTitle,
+    };
+    if (conv) {
+      await env.DB.prepare(
+        "UPDATE sdr_conversations SET contact_id = ?, qualificacao = ?, next_step = ?, updated_at = ? WHERE id = ?",
+      ).bind(contactId, JSON.stringify(qual), "Lead quente encaminhado para Edicleia", now, conv.id).run();
+    } else {
+      await env.DB.prepare(
+        `INSERT INTO sdr_conversations (id, contact_id, channel, external_id, account_id, status, qualificacao, next_step, last_inbound_at, created_at, updated_at)
+         VALUES (?, ?, 'instagram', ?, '17841448438742197', 'ia', ?, ?, ?, ?, ?)`,
+      ).bind(crypto.randomUUID(), contactId, externalId, JSON.stringify(qual), "Lead quente encaminhado para Edicleia", now, now, now).run();
+    }
+
+    const saved = await helpers.saveDirectLead(env, ctx, {
+      contactId,
+      openLead,
+      externalId,
+      name,
+      phone: rawPhone || "",
+      leadType,
+      propertyId,
+      propertyTitle,
+      goal,
+      budgetFit,
+      adTitle,
+      summary,
+    });
+
+    if (saved.isNew || saved.shouldNotify) {
+      await addActivity(env, {
+        contactId,
+        leadId: saved.id,
+        type: "lead",
+        text: summary || `Lead qualificado no Instagram Direct (${propertyTitle || "imóvel a definir"})`,
+        data: { channel: "instagram", goal, budgetFit, propertyId, adTitle },
+      });
+    }
+
+    const hasOpenSdrTask = await env.DB.prepare(
+      "SELECT 1 FROM tasks WHERE contact_id = ? AND origin = 'sdr' AND done_at IS NULL LIMIT 1",
+    ).bind(contactId).first();
+    if (!hasOpenSdrTask) {
+      await createTask(env, {
+        contactId,
+        leadId: saved.id,
+        title: `Chamar ${firstName(name)} (${propertyTitle || "Instagram Direct"})`,
+        dueAt: now,
+        origin: "sdr",
+      });
+    }
+
+    if (saved.shouldNotify) {
+      const goalLabels = { morar: "Comprar para morar", investir: "Investir", vender: "Vender imóvel", avaliar: "Avaliar imóvel" };
+      ctx.waitUntil(notify(env, {
+        subject: `Lead quente do Instagram: ${name} (${goalLabels[goal] || goal})`,
+        lines: [
+          `Nome: ${name}`,
+          `WhatsApp: ${rawPhone ? `https://wa.me/55${rawPhone}` : "Não informado no Direct"}`,
+          `Objetivo: ${goalLabels[goal] || goal}`,
+          budgetFit ? `Orçamento: ${budgetFit}` : null,
+          `Imóvel: ${propertyTitle || "A definir"}`,
+          `Origem: ${adTitle ? `Anúncio Instagram (${adTitle})` : "Instagram Direct"}`,
+          summary ? `Resumo: ${summary}` : null,
+          `Código: ${saved.ref}`,
+        ],
+      }));
+    }
+
+    return ok({ ok: true, leadId: saved.id, ref: saved.ref, contactId, notified: saved.shouldNotify });
+  }
+
+  if (path === "/api/agent/properties" && method === "GET") {
+    const q = url.searchParams.get("q") || "";
+    const rows = (await allProperties(env)).filter(p => !p.sold && p.status !== "vendido");
+    const found = q ? rows.filter(p => foldSafe(p, q)) : rows;
+    return ok(found.slice(0, 20).map(p => ({
+      id: p.id, title: p.title, location: p.location, price: p.price, area: p.area, beds: p.beds, type: p.type,
+    })));
+  }
+
   return notFound();
 }
 
+function foldSafe(property, q) {
+  const blob = `${property.title || ""} ${property.location || ""} ${property.id || ""}`.toLowerCase();
+  return blob.includes(String(q).toLowerCase());
+}
+
+function ebvInstagramAccounts(env) {
+  return String(env.EBV_IG_ACCOUNT_ID || "17841448438742197,29032059263111949")
+    .split(",").map(item => item.trim()).filter(Boolean).join(",");
+}
+
+export async function handleInstagramWebhook(request, env, helpers = {}) {
+  const url = new URL(request.url);
+  if (request.method === "GET") {
+    const mode = url.searchParams.get("hub.mode");
+    const token = url.searchParams.get("hub.verify_token");
+    const challenge = url.searchParams.get("hub.challenge") || "";
+    if (mode === "subscribe" && env.EBV_IG_VERIFY_TOKEN && token === env.EBV_IG_VERIFY_TOKEN) {
+      return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    }
+    return new Response("forbidden", { status: 403 });
+  }
+  if (request.method !== "POST") return new Response("method", { status: 405 });
+  const raw = await request.text();
+  const valid = await verifyMetaSignature(raw, request.headers.get("X-Hub-Signature-256"), env.EBV_IG_APP_SECRET);
+  const accounts = ebvInstagramAccounts(env);
+  if (!valid || !accounts) return new Response("forbidden", { status: 403 });
+  let payload = null;
+  try { payload = JSON.parse(raw); } catch { return new Response("bad", { status: 400 }); }
+  const events = keepForAccount(extractInstagramDirect(payload), accounts);
+  for (const event of events) {
+    await ingestSdrInbound(env, {
+      channel: "instagram",
+      externalId: event.senderId,
+      accountId: event.accountId,
+      text: event.text,
+      messageId: event.messageId,
+    }, helpers);
+  }
+  return new Response("ok", { status: 200 });
+}
+
+function agentSinceValue(env) {
+  const value = String((env && env.IG_AGENT_SINCE) || DIRECT_AGENT_SINCE || "").trim();
+  return Number.isFinite(Date.parse(value)) ? value : "";
+}
+
+async function storeSdrMessage(env, conversationId, direction, body, externalMid) {
+  await env.DB.prepare(
+    "INSERT INTO sdr_messages (id, conversation_id, direction, body, external_mid, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+  ).bind(crypto.randomUUID(), conversationId, direction, body, externalMid, new Date().toISOString()).run();
+}
+
+async function claimDirectReply(env, conversationId, inboundMid, body) {
+  const lockMid = `lock:${String(inboundMid).slice(0, 140)}`;
+  const existing = await env.DB.prepare(
+    "SELECT id FROM sdr_messages WHERE conversation_id = ? AND external_mid = ?",
+  ).bind(conversationId, lockMid).first();
+  if (existing) return { claimed: false };
+  try {
+    await storeSdrMessage(env, conversationId, "reserva", body, lockMid);
+  } catch {
+    return { claimed: false };
+  }
+  return { claimed: true, lockMid };
+}
+
+async function inboundHistory(env, conversationId) {
+  const rows = await env.DB.prepare(
+    "SELECT body FROM sdr_messages WHERE conversation_id = ? AND direction = 'in' ORDER BY created_at DESC LIMIT 6",
+  ).bind(conversationId).all();
+  return (rows.results || []).map(row => row.body).reverse();
+}
+
+async function composeDirectReply(_env, { turn }) {
+  return sanitizeCustomerReply(turn && turn.reply) || "";
+}
+
+async function sendInstagramText(token, recipientId, text) {
+  const res = await fetch("https://graph.instagram.com/v23.0/me/messages", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
+  });
+  let payload = {};
+  try { payload = await res.json(); } catch { payload = {}; }
+  if (!res.ok || !payload.message_id) return { ok: false, status: res.status };
+  return { ok: true, messageId: String(payload.message_id) };
+}
+
+async function deliverDirectReply(env, input) {
+  const fallback = sanitizeCustomerReply(input.fallback) || "";
+  if (!fallback || !input.conversationId) return "held";
+  const claim = await claimDirectReply(env, input.conversationId, input.inboundMid, fallback);
+  if (!claim.claimed) return "held";
+  const outgoing = fallback;
+  const sent = await sendInstagramText(input.token, input.recipientId, outgoing);
+  if (sent.ok) {
+    await env.DB.prepare(
+      "UPDATE sdr_messages SET direction = 'out', body = ?, external_mid = ? WHERE conversation_id = ? AND external_mid = ?",
+    ).bind(outgoing, sent.messageId, input.conversationId, claim.lockMid).run();
+    return "sent";
+  }
+  console.error("ig send", sent.status || 0);
+  await env.DB.prepare(
+    "UPDATE sdr_messages SET direction = 'sugestao', body = ?, external_mid = ? WHERE conversation_id = ? AND external_mid = ?",
+  ).bind(outgoing, `draft:${String(input.inboundMid).slice(0, 150)}`, input.conversationId, claim.lockMid).run();
+  return "held";
+}
+
+// Lê o Direct da EBV e responde só mensagem nova. Não mexe no webhook das outras marcas.
+export async function pollInstagram(env, helpers = {}) {
+  const token = env.IG_TOKEN_EBV;
+  if (!token) return { skipped: "sem_token" };
+  const own = new Set(ebvInstagramAccounts(env).split(","));
+  const windowStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const endpoint = "https://graph.instagram.com/v23.0/me/conversations?fields=updated_time,messages.limit(20){id,message,from,created_time,story,attachments}&limit=10";
+  const res = await fetch(endpoint, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return { error: res.status };
+  const body = await res.json();
+  let seen = 0;
+  let imported = 0;
+  let sent = 0;
+  let held = 0;
+  const now = new Date().toISOString();
+  const sinceAgent = agentSinceValue(env);
+  for (const thread of body.data || []) {
+    const updated = Date.parse(thread.updated_time || "");
+    if (Number.isFinite(updated) && updated < windowStart) continue;
+    const messages = ((thread.messages && thread.messages.data) || []).slice().sort((a, b) => {
+      return (Date.parse(a.created_time || "") || 0) - (Date.parse(b.created_time || "") || 0);
+    });
+    let latestCustomerId = "";
+    let latestAt = -1;
+    for (const msg of messages) {
+      const fromId = String(msg.from && msg.from.id || "");
+      const created = Date.parse(msg.created_time || "") || 0;
+      if (!fromId || own.has(fromId)) continue;
+      if (created >= latestAt) {
+        latestAt = created;
+        latestCustomerId = String(msg.id || "");
+      }
+    }
+    for (const msg of messages) {
+      seen += 1;
+      const created = Date.parse(msg.created_time || "");
+      if (Number.isFinite(created) && created < windowStart) continue;
+      const fromId = String(msg.from && msg.from.id || "");
+      if (!fromId || own.has(fromId)) continue;
+      let text = String(msg.message || msg.text || "").trim();
+      if (!text && msg.story) text = "Respondeu a um story do Instagram.";
+      if (!text && msg.attachments) text = "Enviou uma mídia no Instagram.";
+      if (!text || !msg.id) continue;
+      const isLatest = String(msg.id) === latestCustomerId;
+      const fresh = shouldAutoReplyDirect({
+        channel: "instagram", status: "ia", reply: "ok", createdAt: msg.created_time, agentSince: sinceAgent, now,
+      });
+      if (isLatest && fresh && sent >= 8) continue;
+      const result = await ingestSdrInbound(env, {
+        channel: "instagram",
+        externalId: fromId,
+        accountId: "17841448438742197",
+        text,
+        messageId: msg.id,
+        holdSuggestion: true,
+      }, helpers);
+      if (result && !result.duplicate && !result.ignored && !result.error) imported += 1;
+      const allowed = isLatest && shouldAutoReplyDirect({
+        channel: "instagram",
+        duplicate: Boolean(result && result.duplicate),
+        ignored: Boolean(result && result.ignored),
+        error: Boolean(result && result.error),
+        status: result && result.status,
+        handoff: Boolean(result && result.handoff),
+        reply: result && result.reply,
+        createdAt: msg.created_time,
+        agentSince: sinceAgent,
+        now,
+      });
+      if (isLatest && result && result.reply && !result.duplicate && !result.ignored && !result.error) {
+        await storeSdrMessage(env, result.conversationId, "sugestao", result.reply, null);
+        held += 1;
+      }
+      // O envio fica no perfil Hermes ebv, no VPS, com a assinatura. O site não responde sozinho.
+    }
+  }
+  return { seen, imported, sent, held, agentSince: sinceAgent || null };
+}
+
+export async function ingestSdrInbound(env, input, helpers = {}) {
+  await ensureSchema(env);
+  const channel = input.channel === "instagram" || input.channel === "whatsapp" ? input.channel : "";
+  const externalId = str(input.externalId, 80);
+  if (!channel || !externalId) return { error: "Informe canal e identificador do contato." };
+  const accounts = ebvInstagramAccounts(env);
+  if (channel === "instagram" && accounts && input.accountId && !accounts.split(",").includes(String(input.accountId))) {
+    return { ignored: true, reason: "outra_conta" };
+  }
+  const text = str(input.text, 4000);
+  if (!text) return { error: "Mensagem vazia." };
+  const now = new Date().toISOString();
+  let conversation = await env.DB.prepare(
+    "SELECT * FROM sdr_conversations WHERE channel = ? AND external_id = ?",
+  ).bind(channel, externalId).first();
+  if (!conversation) {
+    const id = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO sdr_conversations (id, contact_id, channel, external_id, account_id, status, qualificacao, next_step, last_inbound_at, created_at, updated_at)
+       VALUES (?, NULL, ?, ?, ?, 'ia', '{}', '', ?, ?, ?)`,
+    ).bind(id, channel, externalId, str(input.accountId, 80) || null, now, now, now).run();
+    conversation = await env.DB.prepare("SELECT * FROM sdr_conversations WHERE id = ?").bind(id).first();
+  }
+  if (input.messageId) {
+    const dup = await env.DB.prepare(
+      "SELECT id FROM sdr_messages WHERE conversation_id = ? AND external_mid = ?",
+    ).bind(conversation.id, str(input.messageId, 180)).first();
+    if (dup) return { duplicate: true, send: false, conversationId: conversation.id };
+  }
+  await env.DB.prepare(
+    "INSERT INTO sdr_messages (id, conversation_id, direction, body, external_mid, created_at) VALUES (?, ?, 'in', ?, ?, ?)",
+  ).bind(crypto.randomUUID(), conversation.id, text, str(input.messageId, 180) || null, now).run();
+
+  if (conversation.status === "humano" || conversation.status === "pausada") {
+    await env.DB.prepare(
+      "UPDATE sdr_conversations SET last_inbound_at = ?, updated_at = ? WHERE id = ?",
+    ).bind(now, now, conversation.id).run();
+    return { send: false, reply: null, status: conversation.status, conversationId: conversation.id, contactId: conversation.contact_id };
+  }
+
+  const stored = safeJson(conversation.qualificacao, {});
+  const properties = await allProperties(env);
+  const turn = qualifyTurn({
+    text,
+    profile: stored,
+    properties,
+    channel,
+    knownName: str(input.name, 120),
+  });
+  const phone = canonicalPhone(turn.profile.phone || input.phone || (channel === "whatsapp" ? externalId : ""));
+  let contactId = conversation.contact_id;
+  let existed = false;
+  if (phone) {
+    existed = Boolean(await env.DB.prepare("SELECT id FROM contacts WHERE phone = ?").bind(phone).first());
+    const leadType = turn.profile.finalidade === "vender" || turn.profile.finalidade === "avaliar" ? "proprietario" : "comprador";
+    const name = fullName(turn.profile.name) || str(input.name, 120) || "Contato do atendimento";
+    const attached = await attachLeadToContact(env, { name, phone, email: null, leadType, kind: channel });
+    contactId = attached.contactId;
+    if (fullName(turn.profile.name)) {
+      await env.DB.prepare("UPDATE contacts SET name = ? WHERE id = ? AND (name = 'Contato do atendimento' OR name NOT LIKE '% %')")
+        .bind(fullName(turn.profile.name), contactId).run();
+    }
+    const profilePatch = {};
+    if (turn.profile.finalidade) profilePatch.finalidade = turn.profile.finalidade;
+    if (turn.profile.pagamento) profilePatch.pagamento = turn.profile.pagamento;
+    if (turn.profile.prazo) profilePatch.prazo = turn.profile.prazo;
+    if (turn.profile.precoMax) profilePatch.precoMax = turn.profile.precoMax;
+    if (turn.profile.visita) profilePatch.visita = turn.profile.visita;
+    if (turn.property && turn.property.line) {
+      const location = properties.find(p => p.id === turn.property.id);
+      if (location && location.location) profilePatch.bairros = [location.location];
+    }
+    if (Object.keys(profilePatch).length) await updateContact(env, contactId, { profile: profilePatch });
+    let leadId = attached.openLead && attached.openLead.id;
+    if (!leadId && helpers.createManualLead) {
+      leadId = await helpers.createManualLead(env, { contactId, name, phone, leadType, kind: "agente" });
+      await addActivity(env, { contactId, leadId, type: "lead", text: `Conversa nova pelo ${channel === "instagram" ? "Instagram" : "WhatsApp"}` });
+    }
+    await addActivity(env, { contactId, leadId, type: "conversa", text: text.slice(0, 500), data: { channel, conversationId: conversation.id } });
+    if (turn.visit) {
+      const pending = await env.DB.prepare(
+        "SELECT id FROM visit_requests WHERE conversation_id = ? AND status = 'pendente' AND COALESCE(property_id, '') = ?",
+      ).bind(conversation.id, turn.visit.propertyId || "").first();
+      if (!pending) {
+        await env.DB.prepare(
+          `INSERT INTO visit_requests (id, contact_id, conversation_id, lead_id, property_id, property_title, when_text, status, created_at, decided_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'pendente', ?, NULL)`,
+        ).bind(crypto.randomUUID(), contactId, conversation.id, leadId, turn.visit.propertyId, turn.visit.propertyTitle, turn.visit.whenText || null, now).run();
+        await createTask(env, { contactId, leadId, title: `Aprovar visita: ${turn.visit.propertyTitle}`, dueAt: now, origin: "sdr" });
+        if (fullName(turn.profile.name)) {
+          await createTask(env, { contactId, leadId, title: "Conferir o nome em fonte pública antes da visita", dueAt: now, origin: "sdr" });
+        }
+      }
+    }
+    const follow = turn.handoff ? null : followUpPlan({ lastInboundAt: now, now: new Date(Date.now() + 5 * 3600000).toISOString(), profile: turn.profile, status: "ia" });
+    if (follow) {
+      const openFollow = await env.DB.prepare(
+        "SELECT id FROM tasks WHERE contact_id = ? AND origin = 'sdr-followup' AND done_at IS NULL",
+      ).bind(contactId).first();
+      if (!openFollow) {
+        await createTask(env, {
+          contactId,
+          leadId,
+          title: follow.title,
+          dueAt: new Date(Date.now() + 4 * 3600000).toISOString(),
+          origin: "sdr-followup",
+        });
+      }
+    }
+  }
+
+  const status = turn.handoff ? "humano" : "ia";
+  await env.DB.prepare(
+    `UPDATE sdr_conversations SET contact_id = ?, status = ?, qualificacao = ?, next_step = ?, last_inbound_at = ?, updated_at = ? WHERE id = ?`,
+  ).bind(contactId, status, JSON.stringify(turn.profile), turn.nextStep, now, now, conversation.id).run();
+  if (turn.reply && !input.holdSuggestion) {
+    await storeSdrMessage(env, conversation.id, "sugestao", turn.reply, null);
+  }
+  return {
+    send: false,
+    reply: turn.reply,
+    status,
+    handoff: Boolean(turn.handoff),
+    nextStep: turn.nextStep,
+    summary: turn.summary,
+    profile: turn.profile,
+    propertyLine: turn.property ? turn.property.line : "",
+    conversationId: conversation.id,
+    contactId,
+    duplicateContact: existed,
+    visitPending: Boolean(turn.visit),
+  };
+}
+
 // ---------- Feed do catálogo para a Meta ----------
+
+async function listAtendimento(env) {
+  const conversations = await env.DB.prepare(
+    `SELECT c.*, ct.name AS contact_name, ct.phone AS contact_phone
+       FROM sdr_conversations c LEFT JOIN contacts ct ON ct.id = c.contact_id
+      ORDER BY c.updated_at DESC LIMIT 100`,
+  ).all();
+  const ids = conversations.results.map(row => row.id);
+  const messages = ids.length
+    ? await env.DB.prepare(
+      `SELECT conversation_id, direction, body, created_at FROM sdr_messages
+        WHERE conversation_id IN (${ids.map(() => "?").join(",")}) ORDER BY created_at DESC`,
+    ).bind(...ids).all()
+    : { results: [] };
+  const latest = {};
+  for (const message of messages.results) {
+    if (!latest[message.conversation_id]) latest[message.conversation_id] = [];
+    if (latest[message.conversation_id].length < 4) latest[message.conversation_id].push(message);
+  }
+  const visits = await env.DB.prepare(
+    `SELECT v.*, ct.name AS contact_name FROM visit_requests v
+       LEFT JOIN contacts ct ON ct.id = v.contact_id
+      WHERE v.status = 'pendente' ORDER BY v.created_at DESC LIMIT 50`,
+  ).all();
+  return {
+    autoreply: "instagram",
+    conversations: conversations.results.map(row => ({
+      ...conversationOut(row),
+      contactName: row.contact_name,
+      phone: row.contact_phone,
+      messages: (latest[row.id] || []).reverse().map(message => ({
+        direction: message.direction, body: message.body, createdAt: message.created_at,
+      })),
+    })),
+    visits: visits.results.map(visit => ({
+      id: visit.id, contactId: visit.contact_id, contactName: visit.contact_name,
+      propertyTitle: visit.property_title, whenText: visit.when_text, status: visit.status, createdAt: visit.created_at,
+    })),
+  };
+}
+
+function conversationOut(row) {
+  const qualification = safeJson(row.qualificacao, {});
+  return {
+    id: row.id, contactId: row.contact_id, channel: row.channel, status: row.status,
+    nextStep: row.next_step, summary: profileSummary({ ...qualification, finalidade: qualification.finalidade }),
+    qualification, lastInboundAt: row.last_inbound_at,
+  };
+}
+
+async function setConversationStatus(env, id, status) {
+  const row = await env.DB.prepare("SELECT * FROM sdr_conversations WHERE id = ?").bind(id).first();
+  if (!row) return false;
+  const now = new Date().toISOString();
+  await env.DB.prepare("UPDATE sdr_conversations SET status = ?, updated_at = ? WHERE id = ?").bind(status, now, id).run();
+  if (row.contact_id) {
+    const text = {
+      humano: "Edicleia assumiu a conversa. A IA parou.",
+      pausada: "IA pausada nesta conversa.",
+      ia: "IA retomada nesta conversa. No Instagram, mensagens novas voltam a ser respondidas.",
+    }[status];
+    await addActivity(env, { contactId: row.contact_id, type: "atendimento", text });
+  }
+  return true;
+}
+
+async function decideVisit(env, id, status) {
+  const row = await env.DB.prepare("SELECT * FROM visit_requests WHERE id = ? AND status = 'pendente'").bind(id).first();
+  if (!row) return false;
+  const now = new Date().toISOString();
+  await env.DB.prepare("UPDATE visit_requests SET status = ?, decided_at = ? WHERE id = ?").bind(status, now, id).run();
+  if (row.contact_id) {
+    await addActivity(env, {
+      contactId: row.contact_id,
+      leadId: row.lead_id,
+      type: "visita",
+      text: status === "aprovada"
+        ? `Visita aprovada para combinar com o cliente: ${row.property_title || "imóvel"}`
+        : `Pedido de visita recusado: ${row.property_title || "imóvel"}`,
+    });
+  }
+  return true;
+}
 
 export async function catalogCsv(env, origin) {
   const rows = await env.DB.prepare("SELECT data FROM properties ORDER BY sort_order ASC").all();
@@ -403,6 +994,14 @@ async function contactDetail(env, id) {
       ? props.map(p => ({ id: p.id, title: p.title, price: p.price, location: p.location, score: matchScore(contact.profile, p) }))
         .filter(p => p.score > 0).sort((a, b) => b.score - a.score).slice(0, 10)
       : [],
+    conversations: (await env.DB.prepare(
+      "SELECT id, channel, status, next_step, qualificacao, last_inbound_at FROM sdr_conversations WHERE contact_id = ? ORDER BY updated_at DESC",
+    ).bind(id).all()).results.map(conversationOut),
+    visits: (await env.DB.prepare(
+      "SELECT id, property_title, when_text, status, created_at FROM visit_requests WHERE contact_id = ? ORDER BY created_at DESC LIMIT 20",
+    ).bind(id).all()).results.map(v => ({
+      id: v.id, propertyTitle: v.property_title, whenText: v.when_text, status: v.status, createdAt: v.created_at,
+    })),
   };
 }
 
@@ -460,8 +1059,10 @@ export function profileSummary(p) {
   if (p.precoMin || p.precoMax) parts.push(`R$ ${p.precoMin ? brl(p.precoMin) : "0"} a ${p.precoMax ? brl(p.precoMax) : "?"}`);
   if (p.quartosMin) parts.push(`${p.quartosMin}+ quartos`);
   if (p.vagasMin) parts.push(`${p.vagasMin}+ vagas`);
+  if (p.finalidade) parts.push(p.finalidade);
   if (p.pagamento) parts.push(p.pagamento);
   if (p.prazo) parts.push(p.prazo);
+  if (p.visita === "sim") parts.push("quer visita");
   return parts.join(" · ") || "vazio";
 }
 
@@ -530,7 +1131,7 @@ async function notify(env, { subject, lines }) {
       method: "POST",
       headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: env.NOTIFY_FROM || "EBV CRM <crm@wellness-protocol.com>",
+        from: env.NOTIFY_FROM || "EBV CRM <crm@ebvimoveiscuritiba.com.br>",
         to: String(env.NOTIFY_EMAIL).split(",").map(s => s.trim()).filter(Boolean),
         subject: subject.slice(0, 200),
         text,

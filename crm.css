@@ -38,6 +38,12 @@
 .crm-btn-sm { padding: 6px 12px; min-height: 32px; font-size: 0.78rem; }
 .crm-btn-wa { border-color: var(--crm-wa); color: var(--crm-wa); }
 .crm-btn:disabled { opacity: 0.5; cursor: default; }
+.crm-sdr-card { background: var(--bg-clean); border: 1px solid var(--border-color); border-radius: var(--crm-radius); padding: 14px 16px; margin-bottom: 12px; }
+.crm-sdr-msg { margin: 6px 0; font-size: 0.92rem; }
+.crm-sdr-msg.is-in { color: var(--text-dark); }
+.crm-sdr-msg.is-out { color: var(--text-dark); font-weight: 600; }
+.crm-sdr-msg.is-sugestao { color: var(--text-light); }
+.crm-status { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
 
 .crm-view { display: none; }
 .crm-view.is-active { display: block; }

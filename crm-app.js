@@ -269,6 +269,16 @@
       ? `<ul class="crm-list-plain">${c.matches.map(m => `<li><span>${esc(m.title)}<br><span class="crm-muted">${esc(m.location || "")}</span></span><span>${esc(money(m.price))}</span></li>`).join("")}</ul>`
       : `<div class="crm-muted">${isBuyer ? "Preencha o perfil de busca para ver os imóveis compatíveis." : "Só para compradores."}</div>`;
 
+    function sdrBox(contact) {
+      const conversations = contact.conversations || [];
+      const visits = contact.visits || [];
+      if (!conversations.length && !visits.length) return '<div class="crm-muted">Nenhuma conversa de WhatsApp ou Instagram.</div>';
+      const statusLabel = (channel, status) => status === "humano" ? "Com a corretora" : status === "pausada" ? "IA pausada" : channel === "instagram" ? "IA no Direct" : "Rascunho no WhatsApp";
+      return `
+        ${visits.map(v => `<p>${esc(v.propertyTitle || "Visita")} · ${esc(v.status)}${v.whenText ? ` · ${esc(v.whenText)}` : ""}</p>`).join("")}
+        ${conversations.map(conv => `<p><strong>${esc(conv.channel)}</strong> · ${esc(statusLabel(conv.channel, conv.status))} · ${esc(conv.nextStep || "")}<br><span class="crm-muted">${esc(conv.summary || "")}</span></p>`).join("")}`;
+    }
+
     const viewed = c.viewedProperties.length
       ? `<ul class="crm-list-plain">${c.viewedProperties.map(v => `<li><span>${esc(v.title)}</span><span>${esc(money(v.price))}</span></li>`).join("")}</ul>`
       : '<div class="crm-muted">Nenhum registro.</div>';
@@ -286,6 +296,7 @@
       </div>
 
       <div class="crm-box"><h4>Negócios</h4>${deals}</div>
+      <div class="crm-box"><h4>Atendimento</h4>${sdrBox(c)}</div>
 
       <div class="crm-box">
         <h4>Tarefas</h4>
@@ -381,6 +392,50 @@
     });
     document.querySelectorAll(".crm-view").forEach(p => p.classList.toggle("is-active", p.dataset.crmPanel === view));
     if (view === "contatos") loadContacts();
+    if (view === "atendimento") loadAtendimento();
+  }
+
+  async function loadAtendimento() {
+    const box = $("#crm-atendimento");
+    box.innerHTML = '<div class="crm-muted">Carregando atendimento...</div>';
+    try {
+      const data = await api("/api/admin/crm/atendimento", { method: "GET" });
+      renderAtendimento(data);
+    } catch (err) {
+      box.innerHTML = `<div class="crm-empty">Não foi possível abrir o atendimento. ${esc(err.message || "")}</div>`;
+    }
+  }
+
+  function renderAtendimento(data) {
+    const statusLabel = (channel, status) => status === "humano" ? "Com a corretora" : status === "pausada" ? "IA pausada" : channel === "instagram" ? "IA no Direct" : "Rascunho no WhatsApp";
+    const visits = (data.visits || []).map(v => `
+      <div class="crm-sdr-card">
+        <strong>${esc(v.contactName || "Contato sem nome")}</strong>
+        <div class="crm-card-sub">${esc(v.propertyTitle || "Imóvel")} ${v.whenText ? `· ${esc(v.whenText)}` : ""}</div>
+        <div class="crm-actions" style="margin-top:8px">
+          <button type="button" class="crm-btn crm-btn-sm crm-btn-primary" data-sdr-visit="${esc(v.id)}" data-sdr-decision="aprovar">Aprovar visita</button>
+          <button type="button" class="crm-btn crm-btn-sm" data-sdr-visit="${esc(v.id)}" data-sdr-decision="recusar">Recusar</button>
+          ${v.contactId ? `<button type="button" class="crm-btn crm-btn-sm" data-open-contact="${esc(v.contactId)}">Abrir ficha</button>` : ""}
+        </div>
+      </div>`).join("") || '<div class="crm-muted">Nenhum pedido pendente.</div>';
+    const conversations = (data.conversations || []).map(c => `
+      <article class="crm-sdr-card">
+        <div class="crm-card-name">${esc(c.contactName || "Ainda sem telefone")} <span class="crm-status">${esc(c.channel)} · ${esc(statusLabel(c.channel, c.status))}</span></div>
+        <div class="crm-card-sub">${esc(c.summary || "Sem qualificação")} · próximo: ${esc(c.nextStep || "—")}</div>
+        ${(c.messages || []).map(m => `<p class="crm-sdr-msg is-${esc(m.direction)}">${m.direction === "out" ? "Enviada: " : m.direction === "sugestao" ? "Rascunho: " : m.direction === "in" ? "Cliente: " : ""}${esc(m.body)}</p>`).join("")}
+        <div class="crm-actions" style="margin-top:8px">
+          <button type="button" class="crm-btn crm-btn-sm crm-btn-primary" data-sdr-conversation="${esc(c.id)}" data-sdr-action="assumir">Assumir conversa</button>
+          <button type="button" class="crm-btn crm-btn-sm" data-sdr-conversation="${esc(c.id)}" data-sdr-action="pausar">Pausar IA</button>
+          <button type="button" class="crm-btn crm-btn-sm" data-sdr-conversation="${esc(c.id)}" data-sdr-action="retomar">Retomar IA</button>
+          ${c.contactId ? `<button type="button" class="crm-btn crm-btn-sm" data-open-contact="${esc(c.contactId)}">Abrir ficha</button>` : ""}
+        </div>
+      </article>`).join("") || '<div class="crm-muted">Nenhuma conversa ainda.</div>';
+    $("#crm-atendimento").innerHTML = `
+      <p class="crm-muted">No Instagram, a IA responde mensagens novas do Direct. O que já estava na caixa não é respondido. Assumir conversa ou Pausar IA interrompe. Aprovar visita não avisa o cliente. No WhatsApp, nada é enviado sozinho.</p>
+      <div class="crm-section-title">Visitas para aprovar</div>
+      ${visits}
+      <div class="crm-section-title">Conversas</div>
+      ${conversations}`;
   }
 
   // ---------- Eventos ----------
@@ -392,6 +447,21 @@
     if (open && open.dataset.openContact) return openContact(open.dataset.openContact);
     if (e.target.closest("[data-crm-close]")) return closeContact();
     if (e.target.closest("[data-crm-new-contact]")) return newContact();
+    const action = e.target.closest("[data-sdr-action]");
+    if (action) {
+      e.preventDefault();
+      api(`/api/admin/crm/conversations/${encodeURIComponent(action.dataset.sdrConversation)}/${action.dataset.sdrAction}`, { method: "POST" })
+        .then(() => { toast("Atendimento atualizado"); return loadAtendimento(); })
+        .catch(() => toast("Não foi possível atualizar a conversa."));
+      return;
+    }
+    const decision = e.target.closest("[data-sdr-decision]");
+    if (decision) {
+      e.preventDefault();
+      api(`/api/admin/crm/visits/${encodeURIComponent(decision.dataset.sdrVisit)}/${decision.dataset.sdrDecision}`, { method: "POST" })
+        .then(() => { toast(decision.dataset.sdrDecision === "aprovar" ? "Visita aprovada para a Edicleia combinar" : "Visita recusada"); return loadAtendimento(); })
+        .catch(() => toast("Não foi possível decidir a visita."));
+    }
   });
 
   document.addEventListener("keydown", e => {

@@ -24,11 +24,18 @@ preview_urls = false
 #   META_TEST_EVENT_CODE (opcional, só para testar eventos no Gerenciador de Eventos)
 #   RESEND_API_KEY + NOTIFY_EMAIL (aviso de lead novo por e-mail; NOTIFY_FROM opcional)
 #   AGENT_TOKEN      (token da API de automação /api/agent/*, para o agente de WhatsApp)
+#   EBV_IG_VERIFY_TOKEN / EBV_IG_APP_SECRET / EBV_IG_ACCOUNT_ID (Direct só da conta da EBV; sem isso o webhook recusa)
+#   O texto do Direct sai do perfil Hermes ebv no VPS, com a assinatura ChatGPT (gpt-5.6-luna). Sem API da OpenAI.
+#   O Direct responde só mensagem nova, depois da data no código. O WhatsApp não envia sozinho.
+#   Aprovar visita no painel não manda mensagem.
 # Sem ADMIN_PASSWORD o painel fica bloqueado (não há senha no código).
 
 [vars]
 ADMIN_USERNAME = "contato@ebvimoveiscuritiba.com.br"
 META_PIXEL_ID = "1430221655110940"  # Conjunto de dados "EBV Imóveis - Site" (portfólio EBV Imóveis)
+
+[triggers]
+crons = ["*/2 * * * *"]
 
 [assets]
 directory = "."

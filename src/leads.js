@@ -337,6 +337,147 @@ export async function createManualLead(env, { contactId, name, phone, email, lea
   return id;
 }
 
+// Lead qualificado vindo do Instagram Direct: grava/atualiza o negócio, envia Lead e QualifiedLead à Meta CAPI (sem duplicar).
+export async function saveDirectLead(env, ctx, {
+  contactId,
+  openLead = null,
+  externalId,
+  name,
+  phone = "",
+  leadType = "comprador",
+  propertyId = null,
+  propertyTitle = null,
+  goal = "",
+  budgetFit = "",
+  adTitle = "",
+  summary = "",
+}) {
+  await ensureSchema(env);
+  const now = new Date().toISOString();
+  const phoneDigits = String(phone || "").replace(/\D/g, "");
+  const tracking = {
+    utm_source: adTitle ? "instagram_ad" : "instagram_direct",
+    ...(adTitle ? { utm_campaign: String(adTitle).slice(0, 200) } : {}),
+  };
+
+  let leadId = "";
+  let ref = "";
+  let data = {};
+  let isNew = false;
+  let shouldNotify = false;
+  let finalName = name || "Contato Instagram";
+  let finalPhone = phoneDigits;
+  let finalPropId = propertyId || null;
+  let finalPropTitle = propertyTitle || null;
+
+  const existingRow = openLead && openLead.id
+    ? await env.DB.prepare("SELECT * FROM leads WHERE id = ?").bind(openLead.id).first()
+    : null;
+
+  if (existingRow) {
+    leadId = existingRow.id;
+    ref = existingRow.ref;
+    data = safeJson(existingRow.data);
+    data.tracking = { ...(data.tracking || {}), ...tracking };
+    if (!data.eventId) data.eventId = `ig:${leadId}`;
+    data.igUserId = externalId;
+    if (goal) data.goal = goal;
+    if (budgetFit) data.budgetFit = budgetFit;
+    if (summary) data.notes = summary;
+
+    let stage = existingRow.stage;
+    if (stage === "novo" || stage === "contatado") {
+      data.history = Array.isArray(data.history) ? data.history.slice(-50) : [];
+      data.history.push({ from: stage, to: "qualificado", at: now });
+      stage = "qualificado";
+    }
+    finalName = name && name !== "Contato Instagram" ? name : existingRow.name;
+    finalPhone = phoneDigits || existingRow.phone || "";
+    finalPropId = propertyId || existingRow.property_id || null;
+    finalPropTitle = propertyTitle || existingRow.property_title || null;
+    shouldNotify = !data.notifiedAt;
+    if (shouldNotify) data.notifiedAt = now;
+
+    await env.DB.prepare(
+      `UPDATE leads SET kind = CASE WHEN kind = 'manual' THEN 'instagram' ELSE kind END,
+         name = ?, phone = ?, property_id = ?, property_title = ?, stage = ?, data = ?, updated_at = ?
+       WHERE id = ?`,
+    ).bind(finalName, finalPhone, finalPropId, finalPropTitle, stage, JSON.stringify(data), now, leadId).run();
+  } else {
+    isNew = true;
+    shouldNotify = true;
+    leadId = crypto.randomUUID();
+    const eventId = `ig:${leadId}`;
+    data = {
+      eventId,
+      tracking,
+      igUserId: externalId,
+      goal: goal || null,
+      budgetFit: budgetFit || null,
+      notes: summary || "",
+      notifiedAt: now,
+      history: [{ to: "qualificado", at: now }],
+    };
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      ref = makeRef();
+      try {
+        await env.DB.prepare(
+          `INSERT INTO leads (id, ref, kind, lead_type, stage, name, phone, email, property_id, property_title, value, contact_id, data, created_at, updated_at)
+           VALUES (?, ?, 'instagram', ?, 'qualificado', ?, ?, NULL, ?, ?, NULL, ?, ?, ?, ?)`,
+        ).bind(
+          leadId, ref, leadType, finalName, finalPhone, finalPropId, finalPropTitle,
+          contactId, JSON.stringify(data), now, now,
+        ).run();
+        break;
+      } catch (err) {
+        if (attempt === 4 || !String(err && err.message).includes("UNIQUE")) throw err;
+      }
+    }
+  }
+
+  const leadObj = {
+    id: leadId,
+    ref,
+    kind: "instagram",
+    lead_type: leadType,
+    stage: "qualificado",
+    name: finalName,
+    phone: finalPhone,
+    email: null,
+    property_id: finalPropId,
+    property_title: finalPropTitle,
+    value: null,
+    data,
+  };
+
+  const sentRows = await env.DB.prepare(
+    "SELECT event_name FROM lead_events WHERE lead_id = ? AND meta_status = 'sent'",
+  ).bind(leadId).all();
+  const sentSet = new Set((sentRows.results || []).map(r => r.event_name));
+  const pendingEvents = [];
+  if (!sentSet.has("Lead")) {
+    pendingEvents.push(sendAndLog(env, leadObj, {
+      eventName: "Lead",
+      eventId: data.eventId || `ig:${leadId}`,
+      actionSource: "system_generated",
+      stage: "qualificado",
+    }));
+  }
+  if (!sentSet.has("QualifiedLead")) {
+    pendingEvents.push(sendAndLog(env, leadObj, {
+      eventName: "QualifiedLead",
+      eventId: `${leadId}:QualifiedLead`,
+      actionSource: "system_generated",
+      stage: "qualificado",
+    }));
+  }
+  if (pendingEvents.length) {
+    ctx.waitUntil(Promise.all(pendingEvents));
+  }
+
+  return { id: leadId, ref, isNew, shouldNotify };
+}
+
 async function sendAndLog(env, lead, { eventName, eventId, actionSource, stage }) {
   let status = "skipped";
   let responseText = "META_PIXEL_ID/META_CAPI_TOKEN não configurados";
@@ -374,11 +515,12 @@ async function buildEvent(lead, { eventName, eventId, actionSource }) {
   const [firstName, ...rest] = String(lead.name || "").trim().toLowerCase().split(/\s+/);
   const lastName = rest.length ? rest[rest.length - 1] : "";
 
+  const normPhone = lead.phone ? normalizePhone(lead.phone) : "";
   const userData = {
-    ph: [await sha256(normalizePhone(lead.phone))],
     external_id: [await sha256(lead.id)],
     country: [await sha256("br")],
   };
+  if (normPhone.length >= 10) userData.ph = [await sha256(normPhone)];
   if (lead.email) userData.em = [await sha256(String(lead.email).trim().toLowerCase())];
   if (firstName) userData.fn = [await sha256(firstName)];
   if (lastName) userData.ln = [await sha256(lastName)];
