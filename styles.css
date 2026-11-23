@@ -1873,6 +1873,74 @@ footer {
   min-width: 880px;
 }
 
+.admin-message-cell {
+  min-width: 260px;
+  max-width: 420px;
+  vertical-align: top;
+}
+
+.admin-message-details summary {
+  display: grid;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 8px;
+  padding: 4px;
+  margin: -4px;
+}
+
+.admin-message-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-message-details summary:focus-visible {
+  outline: 3px solid rgba(21, 94, 99, 0.28);
+  outline-offset: 3px;
+}
+
+.admin-message-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.45;
+}
+
+.admin-message-toggle {
+  color: var(--primary-color);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.admin-message-close-label {
+  display: none;
+}
+
+.admin-message-details[open] .admin-message-preview {
+  display: none;
+}
+
+.admin-message-details[open] .admin-message-open-label {
+  display: none;
+}
+
+.admin-message-details[open] .admin-message-close-label {
+  display: inline;
+}
+
+.admin-message-full {
+  margin: 10px 0 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--bg-section);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 992px) {
   header.scrolled {
     padding: 0;
@@ -1927,6 +1995,17 @@ footer {
 
   .mobile-toggle.active span:nth-child(3) {
     transform: rotate(-45deg) translate(6px, -6px);
+  }
+}
+
+@media (max-width: 600px) {
+  .admin-message-cell {
+    min-width: min(78vw, 320px);
+    max-width: min(78vw, 320px);
+  }
+
+  .admin-message-details summary {
+    min-height: 44px;
   }
 }
 
