@@ -1,5 +1,7 @@
+import json
 import unittest
 from datetime import datetime, timedelta, timezone
+from unittest import mock
 
 import direct_loop as dl
 
@@ -150,6 +152,118 @@ class DirectLoopTests(unittest.TestCase):
         self.assertEqual(dl.due_followup_stage(new_turns, state, "t1", base + timedelta(hours=10))[0], 0)
         self.assertEqual(dl.due_followup_stage(new_turns, state, "t1", base + timedelta(hours=20, minutes=5))[0], 2)
         self.assertEqual(dl.due_followup_stage(new_turns, state, "t1", base + timedelta(hours=23, minutes=45))[0], 0)
+
+        state["skip_followup"] = ["u1"]
+        self.assertEqual(dl.due_followup_stage(new_turns, state, "t1", base + timedelta(hours=20, minutes=5))[0], 0)
+
+        phone_turns = [
+            {"id": "c2", "from": "u2", "role": "cliente", "text": "+5541998952095", "at": base + timedelta(minutes=1)},
+            {"id": "e2", "from": "ebv", "role": "ebv", "text": "Obrigado, encaminhei para a corretora!", "at": base + timedelta(minutes=2)},
+        ]
+        self.assertEqual(dl.due_followup_stage(phone_turns, state, "t2", base + timedelta(hours=4))[0], 0)
+
+    def test_phone_detection_ignores_property_ids_and_prices(self):
+        self.assertEqual(dl.extract_phone("+5541998952095"), "41998952095")
+        self.assertEqual(dl.extract_phone("Meu whats é (41) 99895-2095"), "41998952095")
+        self.assertEqual(dl.extract_phone("Veja https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995 por R$ 1.190.000"), "")
+        self.assertTrue(dl.lead_has_phone([{"role": "cliente", "text": "+5541998952095"}]))
+
+    def test_instagram_profile_and_crm_sync_payload(self):
+        state = {"profiles": {}, "synced": {}, "qualified": []}
+        thread = {"id": "thread1", "updated_time": "2026-11-23T12:00:00+0000", "participants": {"data": [
+            {"id": "17841448438742197", "username": "ebvimoveiscuritiba"},
+            {"id": "1146800138099503", "username": "elisangelaa.moreira"},
+        ]}}
+        with mock.patch.object(dl, "request_json", return_value=({"id": "1146800138099503", "username": "elisangelaa.moreira", "name": "Elisangela Moreira"}, 200)):
+            profile = dl.instagram_profile(thread, "token", state)
+        self.assertEqual(profile["name"], "Elisangela Moreira")
+        turns = [{"id": "m1", "role": "cliente", "text": "99873-2272", "at": datetime(2026, 11, 23, 12, 0, tzinfo=timezone.utc)}]
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"ok":true}'
+        with mock.patch.object(dl, "read_agent_token", return_value="a" * 32), mock.patch.object(dl.urllib.request, "urlopen", return_value=response) as opened, mock.patch.object(dl, "save_state"):
+            self.assertTrue(dl.sync_crm_thread(thread, turns, profile, SAMPLE_CATALOG, state, force=True))
+        payload = json.loads(opened.call_args.args[0].data.decode("utf-8"))
+        self.assertEqual(payload["username"], "elisangelaa.moreira")
+        self.assertEqual(payload["profileName"], "Elisangela Moreira")
+        self.assertEqual(payload["phone"], "41998732272")
+        self.assertTrue(payload["qualified"])
+
+    def test_local_curitiba_phone_without_area_code(self):
+        self.assertEqual(dl.extract_phone("99873-2272"), "41998732272")
+        self.assertEqual(dl.extract_phone("998732272"), "41998732272")
+        self.assertEqual(dl.extract_phone("99873 2272"), "41998732272")
+        self.assertEqual(dl.extract_phone("R$ 1.190.000 e prop-1792252762995"), "")
+
+    def test_luna_reply_suppresses_wa_link_when_lead_already_sent_phone_and_sends_photos_once(self):
+        turns_open = [{"role": "cliente", "text": "Quero o endereço do Triplex no Uberaba de Cima", "referral": None}]
+        fake_open = (
+            "Fica na Rua Júlio Wischral, 993, no Uberaba de Cima.\n\n"
+            "• Valor: R$ 1.190.000\n• Aceita financiamento\n"
+            "https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995\n"
+            "Você gostaria de agendar uma visita para conhecer o Triplex?\n"
+            "[[ENVIAR_FOTOS: Triplex]]"
+        )
+        with mock.patch.object(dl, "call_hermes", return_value=fake_open):
+            reply, photos, crm, _ = dl.luna_reply(turns_open, SAMPLE_CATALOG, photos_sent=False)
+        self.assertEqual(len(photos), 3)
+        self.assertIn("• Valor: R$ 1.190.000", reply)
+        self.assertNotIn("wa.me", reply)
+        self.assertIsNone(crm)
+
+        turns_phone = [
+            {"role": "ebv", "text": "Perfeito! Me passa seu nome completo e número de WhatsApp?"},
+            {"role": "cliente", "text": "Eduardo Tourinho Gomes, +5541998952095"},
+        ]
+        fake_handoff = (
+            "Perfeito, Eduardo! Acabei de encaminhar seu contato para a corretora Edicleia e ela já vai te chamar no WhatsApp. Obrigado!\n"
+            "[[WA_RESUMO: Olá, Edicleia! Interesse no Triplex.]]\n"
+            "[[CRM_LEAD: {\"nome\":\"Eduardo Tourinho Gomes\",\"telefone\":\"+5541998952095\",\"objetivo\":\"morar\",\"orcamento\":\"\",\"imovel\":\"Triplex 220 m²\",\"resumo\":\"Quer visita\"}]]"
+        )
+        with mock.patch.object(dl, "call_hermes", return_value=fake_handoff):
+            reply2, photos2, crm2, _ = dl.luna_reply(turns_phone, SAMPLE_CATALOG, photos_sent=True)
+        self.assertEqual(photos2, [])
+        self.assertNotIn("wa.me", reply2)
+        self.assertIsInstance(crm2, dict)
+        self.assertEqual(crm2["nome"], "Eduardo Tourinho Gomes")
+
+        turns_refusal = [
+            {"role": "ebv", "text": "Me passa seu nome completo e número de WhatsApp?"},
+            {"role": "cliente", "text": "Prefiro não passar meu número, pode mandar o seu WhatsApp?"},
+        ]
+        fake_refusal = (
+            "Sem problemas! Você pode chamar a Edicleia direto pelo link abaixo:\n"
+            "[[WA_RESUMO: Olá, Edicleia! Vim pelo Instagram com interesse no Triplex 220 m² no Uberaba de Cima (R$ 1.190.000).]]\n"
+            "[[CRM_LEAD: {\"nome\":\"\",\"telefone\":\"\",\"objetivo\":\"morar\",\"orcamento\":\"\",\"imovel\":\"Triplex 220 m²\",\"resumo\":\"Preferiu chamar no WhatsApp\"}]]"
+        )
+        with mock.patch.object(dl, "call_hermes", return_value=fake_refusal):
+            reply3, _, crm3, _ = dl.luna_reply(turns_refusal, SAMPLE_CATALOG, photos_sent=True)
+        self.assertIn("https://wa.me/5541988024346?text=", reply3)
+        self.assertIsInstance(crm3, dict)
+
+    def test_luna_followup_stage_1_and_stage_2(self):
+        turns = [
+            {"role": "cliente", "text": "Quero saber condições e agendar visita no Triplex do Uberaba"},
+            {"role": "ebv", "text": "O Triplex tem 220 m²... Você gostaria de agendar uma visita?"},
+        ]
+        with mock.patch.object(dl, "call_hermes", return_value="Oi! Ficou alguma dúvida sobre o Triplex no Uberaba de Cima ou o valor e as condições estão dentro do que você esperava? [[WA_RESUMO: teste]]"):
+            fu1 = dl.luna_followup(turns, SAMPLE_CATALOG, stage=1)
+        self.assertNotIn("wa.me", fu1)
+        self.assertIn("dúvida", fu1.lower())
+
+        with mock.patch.object(dl, "call_hermes", return_value="Oi! Se preferir, chame a corretora Edicleia direto no WhatsApp quando quiser:\n[[WA_RESUMO: Olá, Edicleia! Interesse no <imóvel>.]]"):
+            fu2 = dl.luna_followup(turns, SAMPLE_CATALOG, stage=2)
+        self.assertIn("https://wa.me/5541988024346?text=", fu2)
+        self.assertNotIn("%3C", fu2)
+        self.assertIn("Triplex", fu2)
+
+    def test_prompt_removes_morar_ou_investir_and_sets_complete_triplex_opening(self):
+        prompt = dl.build_system_prompt([{"role": "cliente", "text": "Quero mais fotos do Triplex"}], SAMPLE_CATALOG)
+        self.assertIn("SDR", prompt)
+        self.assertIn("PROIBIDO FAZER PERGUNTAS VAZIAS", prompt)
+        self.assertIn("Aceita apartamento como parte do pagamento (até 50% do valor)", prompt)
+        self.assertIn("Imóvel averbado, documentação ok", prompt)
+        self.assertIn("https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995", prompt)
+        self.assertNotIn("1) Objetivo: pergunte se a busca é para morar ou investir", prompt)
 
 
 if __name__ == "__main__":

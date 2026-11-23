@@ -105,6 +105,7 @@ export async function upsertContactRow(env, { name, phone, email, role, source, 
 export function canonicalPhone(phone) {
   let d = String(phone || "").replace(/\D/g, "").replace(/^0+/, "");
   if ((d.length === 12 || d.length === 13) && d.startsWith("55")) d = d.slice(2);
+  if (d.length === 8 || d.length === 9) d = `41${d}`;
   return d.length >= 10 ? d : null;
 }
 

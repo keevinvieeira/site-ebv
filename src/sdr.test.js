@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   assertEbvSessionDir,
   directAgentPrompt,
+  extractSignals,
   extractInstagramDirect,
   followUpPlan,
   keepForAccount,
@@ -17,6 +18,13 @@ const catalog = [
   { id: "prop-1792252762995", title: "Lindo triplex 220 m2", location: "Uberaba de Cima", area: 220, beds: 3, price: 1190000, type: "sobrado" },
   { id: "prop-jardim", title: "Sobrado amplo", location: "Jardim das Américas", area: 187, beds: 4, price: 1249900, type: "sobrado", status: "vendido" },
 ];
+
+test("normaliza telefone local de Curitiba sem confundir preÃ§o ou cÃ³digo do imÃ³vel", () => {
+  assert.equal(extractSignals("Meu WhatsApp Ã© 99873-2272").phone, "41998732272");
+  assert.equal(extractSignals("998732272").phone, "41998732272");
+  assert.equal(extractSignals("99873 2272").phone, "41998732272");
+  assert.equal(extractSignals("R$ 1.190.000 e prop-1792252762995").phone, undefined);
+});
 
 test("qualifica compra, imóvel e nome sem citar código interno", () => {
   const turn = qualifyTurn({
@@ -57,15 +65,20 @@ test("pedido de pessoa pausa a resposta automática", () => {
   assert.equal(turn.nextStep, "Com a corretora");
 });
 
-test("lembrete só cabe dentro da janela de 24h (~3h e ~20h) e some depois de 24h", () => {
+test("lembrete só cabe dentro da janela de 24h (~3h e ~20h), nunca pergunta morar/investir e some com telefone ou >24h", () => {
   const start = "2026-11-18T12:00:00.000Z";
   const tooEarly = followUpPlan({ lastInboundAt: start, now: "2026-11-18T14:00:00.000Z", profile: {} });
   assert.equal(tooEarly, null);
-  const due1 = followUpPlan({ lastInboundAt: start, now: "2026-11-18T15:30:00.000Z", profile: {}, stage: 1 });
+  const withPhone = followUpPlan({ lastInboundAt: start, now: "2026-11-18T15:30:00.000Z", profile: { phone: "41998952095" }, stage: 1 });
+  assert.equal(withPhone, null);
+  const due1 = followUpPlan({ lastInboundAt: start, now: "2026-11-18T15:30:00.000Z", profile: { name: "Thomas Kova" }, stage: 1 });
   assert.ok(due1);
+  assert.match(due1.text, /Oi, Thomas!/);
+  assert.match(due1.text, /valor e as condições/);
+  assert.equal(/morar ou|investir|achou/i.test(due1.text), false);
   const due2 = followUpPlan({ lastInboundAt: start, now: "2026-11-19T08:30:00.000Z", profile: {}, stage: 2 });
   assert.ok(due2);
-  assert.match(due2.text, /horários/);
+  assert.match(due2.text, /https:\/\/wa\.me\/5541988024346\?text=/);
   const late = followUpPlan({ lastInboundAt: start, now: "2026-11-19T12:00:00.000Z", profile: {} });
   assert.equal(late, null);
 });
@@ -124,8 +137,8 @@ test("Direct só responde mensagem nova, dentro da janela, e sem código interno
   assert.equal(shouldAutoReplyDirect({ ...base, agentSince: "" }), false);
   assert.equal(sanitizeCustomerReply("O código interno é prop-1792252762995."), "");
   assert.equal(
-    sanitizeCustomerReply("Veja aqui: https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995 ou https://wa.me/5541988024346?text=oi"),
-    "Veja aqui: https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995 ou https://wa.me/5541988024346?text=oi",
+    sanitizeCustomerReply("Veja aqui: https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995 ou https://wa.me/5541988024346?text=oi. Quer falar com ela?"),
+    "Veja aqui: https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995 ou https://wa.me/5541988024346?text=oi. Quer falar com ela?",
   );
   assert.equal(sanitizeCustomerReply("Veja https://outrosite.com"), "");
   assert.equal(sanitizeCustomerReply("Rua Júlio Wischral, 993, no Uberaba de Cima?"), "Rua Júlio Wischral, 993, no Uberaba de Cima?");

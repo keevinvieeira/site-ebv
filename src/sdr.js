@@ -19,10 +19,15 @@ export function extractSignals(text) {
   const name = raw.match(/(?:meu nome é|me chamo|eu sou|sou)\s+([A-Za-zÀ-ÿ]{2,}(?:\s+[A-Za-zÀ-ÿ]{2,}){0,3})/i);
   if (name) signals.name = name[1].replace(/\s+/g, " ").trim();
 
-  const phone = raw.match(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)(?:9\s*)?\d{4}[-\s]?\d{4}/);
+  const phoneSource = raw
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/\bprop-[\w-]+\b/gi, " ")
+    .replace(/R\$\s*\d[\d.,]*/gi, " ");
+  const phone = phoneSource.match(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?(?:9\s*)?\d{4}[-\s]?\d{4}\b/);
   if (phone) {
     let digits = phone[0].replace(/\D/g, "").replace(/^0+/, "");
     if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) digits = digits.slice(2);
+    if (digits.length === 8 || digits.length === 9) digits = `41${digits}`;
     if (digits.length >= 10) signals.phone = digits;
   }
 
@@ -191,21 +196,23 @@ export function qualifyTurn({ text, profile = {}, properties = [], channel = "wh
 // Lembretes automáticos só dentro da janela de 24h das plataformas (~3h e ~20h). Fora dela, nunca envia.
 export function followUpPlan({ lastInboundAt, now, profile = {}, status = "ia", stage = 1 }) {
   if (status !== "ia" || !lastInboundAt) return null;
+  if (profile.phone) return null;
   const age = new Date(now).getTime() - new Date(lastInboundAt).getTime();
   const threeHours = 3 * 60 * 60 * 1000;
   const twentyHours = 20 * 60 * 60 * 1000;
   const maxWindow = 23.5 * 60 * 60 * 1000;
   if (!Number.isFinite(age) || age < threeHours || age >= maxWindow) return null;
-  if (fullName(profile.name) && profile.finalidade && profile.pagamento && profile.prazo) return null;
+  const first = String(profile.name || "").trim().split(/\s+/)[0];
+  const greeting = first ? `Oi, ${first}!` : "Oi!";
   if (stage === 2 || age >= twentyHours) {
     return {
-      title: "Última tentativa de retomada dentro de 24h",
-      text: "Oi! Ainda temos horários livres amanhã às 10h ou na sequência às 15h para conhecer o imóvel. Algum desses horários funciona para você?",
+      title: "Última tentativa de retomada dentro de 24h (~20h)",
+      text: `${greeting} Se preferir continuar por lá, você pode chamar a corretora Edicleia direto no WhatsApp quando quiser: https://wa.me/5541988024346?text=Ol%C3%A1%2C%20Edicleia!%20Vim%20pelo%20Instagram%20e%20tenho%20interesse%20no%20im%C3%B3vel.`,
     };
   }
   return {
     title: "Lembrete curto dentro de 24h (~3h)",
-    text: "Oi! Conseguiu dar uma olhada nas informações que te passei ou ficou alguma dúvida sobre o imóvel?",
+    text: `${greeting} Ficou alguma dúvida sobre o imóvel ou o valor e as condições estão dentro do que você esperava?`,
   };
 }
 
@@ -283,7 +290,7 @@ export function sanitizeCustomerReply(text) {
   if (/https?:\/\/|\b(?:www\.|wa\.me\/)/i.test(withoutOfficialUrls)) return "";
   if (/\bsobrado\s*0?2\b/i.test(original)) return "";
   let value = original.replace(/\s+/g, " ").trim().replace(/^["'`“”]+|["'`“”]+$/g, "");
-  if ((value.match(/\?/g) || []).length > 1) return "";
+  if ((withoutOfficialUrls.match(/\?/g) || []).length > 1) return "";
   const bytes = new TextEncoder().encode(value);
   if (bytes.length <= 900) return value;
   let cut = value;
@@ -348,7 +355,7 @@ export function directAgentPrompt({ text, history = [], turn = {}, catalog = [] 
     mensagem: String(text || "").slice(0, 1000),
   };
   return {
-    system: "Você escreve a próxima mensagem do Instagram Direct da EBV Imóveis Curitiba, como uma pessoa da equipe da Edicleia Borba Vieira. Português do Brasil, curto, uma pergunta só por mensagem e toda mensagem termina com '?'. Quando houver contexto do Triplex (anúncio, saudação prévia da Meta ou menção explícita a Triplex/220/Uberaba), responda direto ao pedido sem repetir a saudação automática da Meta nem o preço básico já apresentado; em abertura orgânica genérica sem imóvel nem bairro, pergunte qual imóvel ou bairro procura. Links no Direct: se o lead pedir o link no início/meio, envie apenas o link oficial da ficha do site (https://ebvimoveiscuritiba.com.br/imovel/<id>), sem wa.me; envie https://wa.me/5541988024346?text=... APENAS no final do funil (no fechamento ou na etapa final de pedir o telefone, caso prefira não informar o número). Sobre endereço do Triplex: passe Rua Júlio Wischral, 993, no Uberaba de Cima, a uns 50 m de panificadora (Panificadora Akipão), farmácias e restaurantes, a uma quadra da Rua Capitão Leônidas Marques (segure apenas o complemento sobrado 02 até a confirmação da visita porque o imóvel é habitado). Ordem: após fotos/endereço pergunte o que achou ou o que mais quer ver; depois qualifique morar/investir, prazo e forma de pagamento; depois ofereça visita com 2 opções de dia e horário; só então peça nome e WhatsApp. Não diga que é IA, não invente dados fora do cadastro e não escreva código interno solto.",
+    system: "Você atua como pré-atendimento comercial (SDR) da corretora Edicleia Borba Vieira no Instagram Direct da EBV Imóveis Curitiba. Português do Brasil, natural e direto. NUNCA pergunte se é para 'morar ou investir' (nem na abertura, nem no meio, nem em follow-up). PROIBIDO perguntas vazias ('O que você achou?', 'Gostaria de ver algum outro detalhe?', 'Você já conhece essa região?'). Abertura completa do Triplex (anúncio, saudação da Meta ou menção a Triplex/220/Uberaba): responda direto ao que pediu (se pediu endereço: Rua Júlio Wischral, 993, no Uberaba de Cima, a uns 50 m da Panificadora Akipão, farmácias e restaurantes, a uma quadra da Rua Capitão Leônidas Marques, segurando 'sobrado 02' até confirmar visita) e já entregue na mesma resposta: 3 fotos, introdução (220 m² em 3 andares, 3 quartos sendo 1 suíte, espaço gourmet com deck, garagem para 3 carros, no Uberaba de Cima pertinho do Jardim das Américas), condições (Valor R$ 1.190.000, aceita financiamento, aceita apartamento como parte do pagamento até 50% do valor, imóvel averbado/documentação ok), link do site (https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995) e pergunta final se gostaria de agendar uma visita. Se disser sim para visita, peça nome completo e número de WhatsApp. Se o lead já informou o número de WhatsApp, agradeça pelo nome, confirme que a corretora Edicleia vai chamar no WhatsApp para agendar e NUNCA envie link wa.me. Só envie wa.me/5541988024346?text=... se o lead preferir não passar o telefone ou pedir o WhatsApp da EBV. Em abertura orgânica genérica sem imóvel nem bairro, pergunte qual imóvel ou bairro procura. Não diga que é IA, não invente dados fora do cadastro e não escreva código prop- solto.",
     user: JSON.stringify(facts),
   };
 }

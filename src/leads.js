@@ -232,7 +232,7 @@ export async function deleteLead(env, id) {
 async function saveLead(request, env, ctx, input) {
   const now = new Date();
   const nowIso = now.toISOString();
-  const phoneDigits = input.phone.replace(/\D/g, "");
+  const phoneDigits = canonicalPhone(input.phone) || "";
 
   // Evita duplicar o mesmo contato clicando várias vezes no mesmo imóvel.
   const since = new Date(now.getTime() - DEDUP_WINDOW_MS).toISOString();
@@ -328,7 +328,7 @@ export async function createManualLead(env, { contactId, name, phone, email, lea
       await env.DB.prepare(
         `INSERT INTO leads (id, ref, kind, lead_type, stage, name, phone, email, property_id, property_title, value, contact_id, data, created_at, updated_at)
          VALUES (?, ?, ?, ?, 'novo', ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?)`,
-      ).bind(id, makeRef(), kind, leadType, name, String(phone || "").replace(/\D/g, ""), email || null, contactId, JSON.stringify(data), now, now).run();
+      ).bind(id, makeRef(), kind, leadType, name, canonicalPhone(phone) || "", email || null, contactId, JSON.stringify(data), now, now).run();
       return id;
     } catch (err) {
       if (attempt === 4 || !String(err && err.message).includes("UNIQUE")) throw err;
@@ -354,7 +354,7 @@ export async function saveDirectLead(env, ctx, {
 }) {
   await ensureSchema(env);
   const now = new Date().toISOString();
-  const phoneDigits = String(phone || "").replace(/\D/g, "");
+  const phoneDigits = canonicalPhone(phone) || "";
   const tracking = {
     utm_source: adTitle ? "instagram_ad" : "instagram_direct",
     ...(adTitle ? { utm_campaign: String(adTitle).slice(0, 200) } : {}),
@@ -563,7 +563,8 @@ function validateLeadInput(value) {
   const name = typeof value.name === "string" ? value.name.trim() : "";
   const phone = typeof value.phone === "string" ? value.phone.trim() : "";
   if (!name || name.length > 120) return { error: "Informe seu nome." };
-  const digits = phone.replace(/\D/g, "");
+  const digits = canonicalPhone(phone);
+  if (!digits) return { error: "Informe um WhatsApp vÃ¡lido." };
   if (digits.length < 10 || digits.length > 13) return { error: "Informe um WhatsApp válido com DDD." };
 
   const leadType = value.leadType === "proprietario" ? "proprietario" : "comprador";
@@ -577,7 +578,7 @@ function validateLeadInput(value) {
 
   return {
     value: {
-      name, phone, leadType, context, interest, cta, propertyId, propertyTitle, value: leadValue,
+      name, phone: digits, leadType, context, interest, cta, propertyId, propertyTitle, value: leadValue,
       tracking: sanitizeTracking(value.tracking),
       viewed: Array.isArray(value.viewed) ? value.viewed.filter(x => typeof x === "string" && x.length <= 200).slice(0, 20) : [],
     },

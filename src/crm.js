@@ -311,6 +311,99 @@ export async function handleAgentApi(request, env, ctx, path, method, readBody, 
     return ok(result);
   }
 
+  if (path === "/api/agent/direct-sync" && method === "POST") {
+    const body = await readBody();
+    if (body.error) return body.error;
+    const b = body.value || {};
+    const externalId = str(b.externalId, 80);
+    if (!externalId) return bad("Informe externalId.");
+    const username = str(b.username, 100).replace(/^@+/, "");
+    const profileName = str(b.profileName, 120);
+    const displayName = profileName || (username ? `@${username}` : "Contato Instagram");
+    const phone = canonicalPhone(b.phone);
+    const qualified = Boolean(b.qualified || phone);
+    const propertyId = str(b.propertyId, 200) || null;
+    const propertyTitle = str(b.propertyTitle, 200) || null;
+    const adTitle = str(b.adTitle, 200);
+    const now = new Date().toISOString();
+    let conv = await env.DB.prepare("SELECT * FROM sdr_conversations WHERE channel = 'instagram' AND external_id = ?")
+      .bind(externalId).first();
+    if (!conv) {
+      const id = crypto.randomUUID();
+      await env.DB.prepare(
+        `INSERT INTO sdr_conversations (id, contact_id, channel, external_id, account_id, status, qualificacao, next_step, last_inbound_at, created_at, updated_at)
+         VALUES (?, NULL, 'instagram', ?, ?, 'ia', '{}', '', NULL, ?, ?)`,
+      ).bind(id, externalId, ebvInstagramAccounts(env).split(",")[0], now, now).run();
+      conv = await env.DB.prepare("SELECT * FROM sdr_conversations WHERE id = ?").bind(id).first();
+    }
+
+    const messages = Array.isArray(b.messages) ? b.messages.slice(-100) : [];
+    let lastInboundAt = conv.last_inbound_at;
+    for (const item of messages) {
+      const direction = item && item.direction === "out" ? "out" : "in";
+      const text = str(item && item.body, 4000);
+      const mid = str(item && item.externalMid, 180) || null;
+      const createdAt = item && !Number.isNaN(Date.parse(item.createdAt)) ? new Date(item.createdAt).toISOString() : now;
+      if (!text) continue;
+      await env.DB.prepare(
+        "INSERT OR IGNORE INTO sdr_messages (id, conversation_id, direction, body, external_mid, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+      ).bind(crypto.randomUUID(), conv.id, direction, text, mid, createdAt).run();
+      if (direction === "in" && (!lastInboundAt || createdAt > lastInboundAt)) lastInboundAt = createdAt;
+    }
+
+    let contactId = conv.contact_id;
+    let openLead = null;
+    if (phone || qualified) {
+      if (phone) {
+        const attached = await attachLeadToContact(env, { name: displayName, phone, email: null, leadType: "comprador", kind: "instagram" });
+        contactId = attached.contactId;
+        openLead = attached.openLead;
+      } else if (!contactId) {
+        contactId = await upsertContactRow(env, { name: displayName, phone: null, email: null, role: "comprador", source: "instagram" });
+      }
+    }
+    if (contactId) {
+      const contact = await env.DB.prepare("SELECT name, profile FROM contacts WHERE id = ?").bind(contactId).first();
+      const currentProfile = safeJson(contact && contact.profile, {});
+      currentProfile.instagramUsername = username || currentProfile.instagramUsername || "";
+      currentProfile.instagramName = profileName || currentProfile.instagramName || "";
+      const shouldRename = !contact || !contact.name || ["Sem nome", "Contato do atendimento", "Contato Instagram"].includes(contact.name) || contact.name.startsWith("@");
+      await env.DB.prepare("UPDATE contacts SET name = ?, phone = COALESCE(phone, ?), profile = ?, updated_at = ?, last_activity_at = MAX(last_activity_at, ?) WHERE id = ?")
+        .bind(shouldRename ? displayName : contact.name, phone, JSON.stringify(currentProfile), now, lastInboundAt || now, contactId).run();
+    }
+
+    const qualification = {
+      ...safeJson(conv.qualificacao, {}),
+      name: profileName || safeJson(conv.qualificacao, {}).name || "",
+      phone: phone || safeJson(conv.qualificacao, {}).phone || "",
+      instagramUsername: username,
+      instagramName: profileName,
+      propertyId,
+      propertyTitle,
+      adTitle,
+    };
+    let saved = null;
+    if (qualified && contactId) {
+      if (!openLead) {
+        const row = await env.DB.prepare(
+          `SELECT id, ref, data FROM leads WHERE contact_id = ? AND stage IN (${OPEN_STAGES.map(() => "?").join(",")}) ORDER BY created_at DESC LIMIT 1`,
+        ).bind(contactId, ...OPEN_STAGES).first();
+        if (row) openLead = { id: row.id, ref: row.ref, eventId: safeJson(row.data).eventId };
+      }
+      saved = await helpers.saveDirectLead(env, ctx, {
+        contactId, openLead, externalId, name: displayName, phone: phone || "", leadType: "comprador",
+        propertyId, propertyTitle, goal: "comprar", budgetFit: "", adTitle,
+        summary: str(b.summary, 2000) || `Instagram @${username || externalId}`,
+      });
+      qualification.leadId = saved.id;
+      qualification.stage = "qualificado";
+    }
+    await env.DB.prepare(
+      "UPDATE sdr_conversations SET contact_id = ?, qualificacao = ?, next_step = ?, last_inbound_at = ?, updated_at = ? WHERE id = ?",
+    ).bind(contactId, JSON.stringify(qualification), qualified ? "Lead no funil: Qualificado" : conv.next_step || "", lastInboundAt, now, conv.id).run();
+    return ok({ ok: true, conversationId: conv.id, contactId, leadId: saved && saved.id, username, phone: phone || "" });
+  }
+
   if (path === "/api/agent/direct-lead" && method === "POST") {
     const body = await readBody();
     if (body.error) return body.error;
@@ -795,7 +888,9 @@ export async function ingestSdrInbound(env, input, helpers = {}) {
 
 async function listAtendimento(env) {
   const conversations = await env.DB.prepare(
-    `SELECT c.*, ct.name AS contact_name, ct.phone AS contact_phone
+    `SELECT c.*, ct.name AS contact_name, ct.phone AS contact_phone,
+            (SELECT l.id FROM leads l WHERE l.contact_id = c.contact_id ORDER BY l.updated_at DESC LIMIT 1) AS lead_id,
+            (SELECT l.stage FROM leads l WHERE l.contact_id = c.contact_id ORDER BY l.updated_at DESC LIMIT 1) AS lead_stage
        FROM sdr_conversations c LEFT JOIN contacts ct ON ct.id = c.contact_id
       ORDER BY c.updated_at DESC LIMIT 100`,
   ).all();
@@ -822,6 +917,8 @@ async function listAtendimento(env) {
       ...conversationOut(row),
       contactName: row.contact_name,
       phone: row.contact_phone,
+      leadId: row.lead_id,
+      leadStage: row.lead_stage,
       messages: (latest[row.id] || []).reverse().map(message => ({
         direction: message.direction, body: message.body, createdAt: message.created_at,
       })),
@@ -838,7 +935,8 @@ function conversationOut(row) {
   return {
     id: row.id, contactId: row.contact_id, channel: row.channel, status: row.status,
     nextStep: row.next_step, summary: profileSummary({ ...qualification, finalidade: qualification.finalidade }),
-    qualification, lastInboundAt: row.last_inbound_at,
+    qualification, instagramUsername: qualification.instagramUsername || "",
+    instagramName: qualification.instagramName || "", lastInboundAt: row.last_inbound_at,
   };
 }
 
@@ -938,6 +1036,7 @@ async function overview(env) {
     return {
       id: l.id, ref: l.ref, kind: l.kind, leadType: l.lead_type, stage: l.stage, name: l.name, phone: l.phone,
       propertyTitle: l.property_title, value: l.value, contactId: l.contact_id, lostReason: l.lost_reason,
+      instagramUsername: data.instagramUsername || "", summary: data.summary || "",
       origin, createdAt: l.created_at, updatedAt: l.updated_at,
     };
   });

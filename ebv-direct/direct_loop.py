@@ -36,18 +36,23 @@ ACTIVE_AD_PROPERTY_ID = "prop-1792252762995"
 
 PUBLIC_EXTRAS = {
     "prop-1792252762995": {
-        "bairro_completo": "Uberaba de Cima (Jardim Santa Bárbara, Uberaba)",
+        "bairro_completo": "Uberaba de Cima (Jardim Santa Bárbara, Uberaba, pertinho do Jardim das Américas)",
         "endereco_publico": (
-            "Rua Júlio Wischral, 993, no Uberaba de Cima, a uns 50 m de panificadora "
-            "(Panificadora Akipão), farmácias e restaurantes, a uma quadra da Rua Capitão Leônidas Marques"
+            "Rua Júlio Wischral, 993, no Uberaba de Cima, a uns 50 m da Panificadora Akipão, "
+            "farmácias e restaurantes, e a uma quadra da Rua Capitão Leônidas Marques"
         ),
         "regra_complemento": (
             "O complemento específico da unidade dentro do lote só pode ser passado na confirmação da visita, "
             "porque o imóvel é habitado."
         ),
+        "condicoes_aprovadas": (
+            "Valor: R$ 1.190.000 | Aceita financiamento | "
+            "Aceita apartamento como parte do pagamento (até 50% do valor) | "
+            "Imóvel averbado, documentação ok"
+        ),
         "detalhes": (
-            "Aceita entrada + financiamento. Sala de estar com lareira, sala de jantar para até 8 pessoas, "
-            "espaço gourmet com cobertura em vidro temperado e deck de itaúba, suíte com closet (porta panorâmica), "
+            "220 m² em 3 andares, 3 quartos (sendo 1 suíte com closet e porta panorâmica), "
+            "sala de estar com lareira, sala de jantar para até 8 pessoas, espaço gourmet com cobertura em vidro temperado e deck de itaúba, "
             "ático amplo para cinema ou academia, espaço para home office (3+ estações) e garagem para até 3 carros (2 em paralelo)."
         ),
     },
@@ -122,6 +127,15 @@ def load_state():
         if "qualified" not in state or not isinstance(state.get("qualified"), list):
             state["qualified"] = []
             changed = True
+        if "photos_sent" not in state or not isinstance(state.get("photos_sent"), list):
+            state["photos_sent"] = []
+            changed = True
+        if "profiles" not in state or not isinstance(state.get("profiles"), dict):
+            state["profiles"] = {}
+            changed = True
+        if "synced" not in state or not isinstance(state.get("synced"), dict):
+            state["synced"] = {}
+            changed = True
         if changed:
             save_state(state)
         return state
@@ -133,6 +147,9 @@ def load_state():
         "pending": [],
         "followups": {},
         "qualified": [],
+        "photos_sent": [],
+        "profiles": {},
+        "synced": {},
     }
     save_state(state)
     return state
@@ -143,6 +160,9 @@ def save_state(state):
     state["failed"] = state.get("failed", [])[-200:]
     state["pending"] = state.get("pending", [])[-200:]
     state["qualified"] = state.get("qualified", [])[-300:]
+    state["photos_sent"] = state.get("photos_sent", [])[-300:]
+    state["profiles"] = dict(list((state.get("profiles") or {}).items())[-300:])
+    state["synced"] = dict(list((state.get("synced") or {}).items())[-300:])
     followups = state.get("followups") or {}
     if len(followups) > 200:
         keys = list(followups.keys())[-200:]
@@ -186,6 +206,22 @@ def is_allowed_url(raw_url):
     return False
 
 
+def normalize_whitespace(text):
+    lines = []
+    blank = False
+    for raw_line in str(text or "").splitlines():
+        line = " ".join(raw_line.split())
+        if line:
+            lines.append(line)
+            blank = False
+        elif lines and not blank:
+            lines.append("")
+            blank = True
+    while lines and not lines[-1]:
+        lines.pop()
+    return "\n".join(lines)
+
+
 def strip_urls(text):
     def _keep_or_drop(match):
         token = match.group(0)
@@ -197,15 +233,16 @@ def strip_urls(text):
         return " "
 
     cleaned = re.sub(r"(?:https?://|www\.|wa\.me/)\S+", _keep_or_drop, str(text or ""), flags=re.IGNORECASE)
-    return " ".join(cleaned.split())
+    return normalize_whitespace(cleaned)
 
 
 def mask_private_unit(text):
     value = str(text or "")
     value = re.sub(r",?\s*\bsobrado\s*0?2\b", "", value, flags=re.IGNORECASE)
-    value = re.sub(r"\s+,", ",", value)
+    value = re.sub(r"[ \t]+,", ",", value)
     value = re.sub(r",\s*,+", ",", value)
-    return " ".join(value.split()).strip(" ,")
+    lines = [line.strip(" ,") if line.strip() else "" for line in value.splitlines()]
+    return normalize_whitespace("\n".join(lines))
 
 
 def without_official_urls(text):
@@ -214,11 +251,40 @@ def without_official_urls(text):
     return cleaned
 
 
-def sanitize(text, max_bytes=900):
+def extract_phone(text):
+    cleaned = re.sub(r"\bprop-[\w-]+\b", " ", without_official_urls(text), flags=re.IGNORECASE)
+    cleaned = re.sub(r"R\$\s*\d[\d.,]*", " ", cleaned, flags=re.IGNORECASE)
+    for match in re.finditer(r"(?:\+?55[\s.-]*)?(?:\(?\d{2}\)?[\s.-]*)(?:9[\s.-]*)?\d{4}[\s.-]?\d{4}\b", cleaned):
+        digits = re.sub(r"\D", "", match.group(0)).lstrip("0")
+        if len(digits) in (12, 13) and digits.startswith("55"):
+            digits = digits[2:]
+        if len(digits) in (10, 11):
+            return digits
+    mobile = re.search(r"\b9\d{4}[-\s]?\d{4}\b", cleaned)
+    if mobile:
+        return "41" + re.sub(r"\D", "", mobile.group(0))
+    local = re.search(r"\b\d{4}[-\s]?\d{4}\b", cleaned)
+    if local:
+        return "41" + re.sub(r"\D", "", local.group(0))
+    return ""
+
+
+def lead_has_phone(turns, crm_lead=None):
+    if isinstance(crm_lead, dict):
+        tel = re.sub(r"\D", "", str(crm_lead.get("telefone") or ""))
+        if len(tel) >= 8:
+            return True
+    for turn in turns or []:
+        if turn.get("role") == "cliente" and extract_phone(turn.get("text")):
+            return True
+    return False
+
+
+def sanitize(text, max_bytes=950):
     value = strip_urls(text)
     value = re.sub(r"(?<!/imovel/)\bprop-[\w-]+\b", "", value, flags=re.IGNORECASE)
     value = mask_private_unit(value)
-    value = " ".join(value.split()).strip().strip("\"'`“”")
+    value = normalize_whitespace(value).strip().strip("\"'`“”")
     if not value:
         return ""
     outside = without_official_urls(value).lower()
@@ -226,7 +292,9 @@ def sanitize(text, max_bytes=900):
         return ""
     raw = value.encode("utf-8")
     if len(raw) > max_bytes:
-        value = raw[:max_bytes].decode("utf-8", "ignore").rsplit(" ", 1)[0].strip()
+        partial = raw[:max_bytes].decode("utf-8", "ignore")
+        parts = re.split(r"\s+(?=\S*$)", partial)
+        value = (parts[0] if len(parts) > 1 else partial).strip()
     return value
 
 
@@ -362,6 +430,8 @@ def public_line(prop):
         bits.append("endereço público aprovado: " + extra["endereco_publico"])
     if extra.get("regra_complemento"):
         bits.append(extra["regra_complemento"])
+    if extra.get("condicoes_aprovadas"):
+        bits.append("condições aprovadas: " + extra["condicoes_aprovadas"])
     if extra.get("detalhes"):
         bits.append("detalhes confirmados: " + extra["detalhes"])
     bits.append(f"link oficial da página do imóvel no site: {SITE}/imovel/{pid}")
@@ -509,7 +579,7 @@ def build_wa_link(summary):
     if not clean:
         return f"https://wa.me/{EDICLEIA_WA}"
     folded = clean.lower()
-    if "código" in folded or "codigo" in folded:
+    if "código" in folded or "codigo" in folded or "<" in clean or ">" in clean:
         return f"https://wa.me/{EDICLEIA_WA}"
     if len(clean) > 280:
         clean = clean[:280].rsplit(" ", 1)[0].strip()
@@ -571,8 +641,72 @@ def match_property_from_text(text, properties):
 
 def read_agent_token():
     if AGENT_TOKEN_FILE.exists():
-        return AGENT_TOKEN_FILE.read_text(encoding="utf-8").strip()
+        return AGENT_TOKEN_FILE.read_text(encoding="utf-8-sig").lstrip("\ufeff").strip()
     return ""
+
+
+def instagram_profile(thread, token, state):
+    participants = ((thread.get("participants") or {}).get("data") or [])
+    person = next((p for p in participants if str(p.get("id") or "") not in OWN), {})
+    external_id = str(person.get("id") or "")
+    cached = (state.get("profiles") or {}).get(external_id) or {}
+    username = str(person.get("username") or cached.get("username") or "").strip().lstrip("@")
+    name = str(cached.get("name") or "").strip()
+    if external_id and (not username or not name):
+        profile, status = request_json(GRAPH + "/" + external_id + "?fields=id,username,name", token)
+        if status == 200 and isinstance(profile, dict):
+            username = str(profile.get("username") or username).strip().lstrip("@")
+            name = str(profile.get("name") or name).strip()
+            state.setdefault("profiles", {})[external_id] = {"username": username, "name": name}
+    return {"id": external_id, "username": username, "name": name}
+
+
+def sync_crm_thread(thread, turns, profile, properties, state, force=False):
+    external_id = str(profile.get("id") or "")
+    updated = str(thread.get("updated_time") or "")
+    if not external_id or (not force and (state.get("synced") or {}).get(external_id) == updated):
+        return True
+    agent_token = read_agent_token()
+    if not agent_token:
+        return False
+    phone = next((extract_phone(t.get("text")) for t in reversed(turns) if t.get("role") == "cliente" and extract_phone(t.get("text"))), "")
+    chat_blob = " ".join(str(t.get("text") or "") for t in turns)
+    prop = match_property_from_text(chat_blob, properties)
+    if not prop and is_triplex_ad_context(turns):
+        prop = next((p for p in (properties or []) if p.get("id") == ACTIVE_AD_PROPERTY_ID), None)
+    payload = {
+        "externalId": external_id,
+        "username": profile.get("username") or "",
+        "profileName": profile.get("name") or "",
+        "phone": phone,
+        "qualified": bool(phone or external_id in set(state.get("qualified") or [])),
+        "propertyId": str(prop.get("id") or "") if prop else "",
+        "propertyTitle": short_title(prop.get("title")) if prop else "",
+        "adTitle": ad_title_from(turns),
+        "messages": [{
+            "externalMid": t.get("id") or "",
+            "direction": "out" if t.get("role") == "ebv" else "in",
+            "body": t.get("text") or "",
+            "createdAt": stamp(t.get("at")),
+        } for t in turns if t.get("text")],
+    }
+    req = urllib.request.Request(
+        SITE + "/api/agent/direct-sync",
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
+        headers={"Authorization": "Bearer " + agent_token, "Content-Type": "application/json", "User-Agent": CATALOG_UA},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as res:
+            json.loads(res.read().decode("utf-8"))
+        state.setdefault("synced", {})[external_id] = updated
+        save_state(state)
+        return True
+    except urllib.error.HTTPError as err:
+        print(f"direct sync_fail status={err.code}", flush=True)
+    except Exception as err:
+        print(f"direct sync_fail {type(err).__name__}", flush=True)
+    return False
 
 
 def push_crm_lead(external_id, crm_lead, wa_summary, turns, properties):
@@ -646,7 +780,7 @@ def take_photos(text, allowed):
     return cleaned, found
 
 
-def build_system_prompt(turns, properties):
+def build_system_prompt(turns, properties, photos_sent=False):
     lines = [public_line(prop) for prop in properties or []]
     lines = [line for line in lines if line]
     if lines:
@@ -656,52 +790,62 @@ def build_system_prompt(turns, properties):
     origin = ad_note(turns)
     chat = transcript(turns) or "Cliente: (sem texto)"
     index = stock_index(properties) or "- cadastro sem imóveis nesta leitura"
-    slots = next_visit_slots()
+    photos_flag = "SIM" if photos_sent else "NÃO"
     return (
-        "Você conversa no Instagram Direct da EBV Imóveis Curitiba, como uma pessoa da equipe da Edicleia Borba Vieira. "
+        "Você atua como pré-atendimento comercial (SDR) da corretora Edicleia Borba Vieira no Instagram Direct da EBV Imóveis Curitiba. "
         "Português do Brasil, natural, direto e acolhedor.\n"
+        "SUA MISSÃO DE PRÉ-VENDA (SDR):\n"
+        "- Entregar de imediato o que o lead pediu com clareza e conduzir a conversa para o agendamento da visita, "
+        "coletando nome completo e número de WhatsApp para a corretora Edicleia assumir o atendimento.\n"
         "REGRAS INEGOCIÁVEIS:\n"
+        "- NUNCA pergunte se a pessoa busca o imóvel para 'morar ou investir' (nem na abertura, nem no meio, nem em follow-up). No Triplex o público compra para morar.\n"
+        "- PROIBIDO FAZER PERGUNTAS VAZIAS: nunca pergunte 'O que você achou?', 'O que achou dessas fotos/localização?', "
+        "'Gostaria de ver algum outro detalhe?', 'O que mais gostaria de ver?' ou 'Você já conhece essa região?'.\n"
         "- Não diga que é inteligência artificial. Não invente imóvel, preço, metragem, disponibilidade, condições de pagamento ou benefícios fora do cadastro.\n"
-        "- Nunca prometa algo que não esteja no cadastro (ex: não prometa que permuta/FGTS já estão aprovados se não constar no cadastro; apenas pergunte como pretende pagar para a Edicleia avaliar). Não prometa vídeo.\n"
-        "- LINKS PERMITIDOS NO DIRECT: é PERMITIDO enviar os links oficiais do site da EBV que constam no catálogo (como https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995) quando o cliente pedir o link do imóvel no início ou meio da conversa. NUNCA envie link do WhatsApp (wa.me) no início ou no meio da conversa.\n"
-        "- LINK DO WHATSAPP (SÓ NO FINAL DO FUNIL): envie https://wa.me/5541988024346 (sempre via [[WA_RESUMO: ...]]) APENAS no FINAL DO FUNIL — ou no fechamento após receber nome e WhatsApp, ou na etapa final de pedir o telefone se o lead preferir não informar o próprio número.\n"
-        "- Nunca comece com 'Claro!' seguido de recusa (ex: nunca diga 'Por aqui não envio links'). Se o cliente pedir o link do imóvel, entregue apenas o link oficial da página do imóvel no site (sem wa.me) e termine com 1 pergunta natural.\n"
-        "- Nunca escreva código interno solto fora da URL oficial do site. Não peça documento, CPF ou RG.\n"
-        "- FAÇA APENAS UMA PERGUNTA POR MENSAGEM. E TODA MENSAGEM SUA DEVE TERMINAR COM UMA PERGUNTA (com '?'). Nunca envie fotos ou texto sem terminar com uma pergunta.\n"
-        "CONTEXTO DE ANÚNCIO E IMÓVEIS:\n"
-        "- Quando houver origem de anúncio do Triplex, menção ao Triplex/220 m²/Uberaba ou saudação anterior sobre o Triplex, responda diretamente sobre o Sobrado Triplex 220 m² no Uberaba de Cima (R$ 1.190.000) e NUNCA pergunte 'sobre qual imóvel você quer saber?'.\n"
-        "- NÃO REPITA A SAUDAÇÃO DA META: se a saudação automática ('Olá! Que bom ver seu interesse no Triplex...') já tiver aberto a conversa ou o cliente tiver clicado em um dos botões do anúncio ('Quero o endereço do Triplex...', 'Quero mais fotos do Triplex...', 'Quero saber condições e agendar visita...'), NÃO repita boas-vindas genéricas nem repita a apresentação básica do preço; responda direto e de forma acolhedora ao que o lead pediu (endereço, fotos ou condições/visita) e termine com 1 pergunta ('?').\n"
-        "- Se citar outro bairro do resumo abaixo, fale dos imóveis daquele bairro.\n"
-        "- Se for uma mensagem orgânica genérica sem contexto de imóvel nem saudação prévia do Triplex (ex.: apenas 'valor' ou 'endereço'), não presuma um imóvel: pergunte de forma cordial qual imóvel ou bairro a pessoa procura.\n"
-        "ENDEREÇO DO TRIPLEX (Uberaba de Cima):\n"
-        "- Quando perguntarem o endereço/localização do Triplex, responda com o endereço completo aprovado: "
-        "'Rua Júlio Wischral, 993, no Uberaba de Cima, a uns 50 m de panificadora (Panificadora Akipão), farmácias e restaurantes, a uma quadra da Rua Capitão Leônidas Marques' "
-        "e termine com uma frase de pergunta separada por ponto (ex: '...e a uma quadra da Rua Capitão Leônidas Marques. O que você achou dessa localização?').\n"
-        "- NUNCA passe o complemento 'sobrado 02' antes de a visita estar confirmada. Se perguntarem qual é a casa ou unidade específica dentro do lote, explique com naturalidade que o complemento é passado na confirmação da visita porque o imóvel é habitado.\n"
-        "FOTOS:\n"
-        "- Quando o cliente pedir fotos ou mais detalhes (e ainda não tiver recebido fotos nesta conversa), JÁ ENVIE as 3 fotos na hora! Descreva brevemente os 3 ambientes (no Triplex: fachada de dia, espaço gourmet com cobertura de vidro e ático com lareira), termine com a pergunta (ex: 'O que você achou dessas fotos, ou gostaria de ver algum outro detalhe?'), e na última linha escreva a tag oculta [[ENVIAR_FOTOS: Triplex]] (ou o nome do imóvel). Nunca pergunte 'Você gostaria de receber as fotos?' quando o cliente já pediu fotos ou detalhes.\n"
-        "- Nunca repita fotos que já foram enviadas na conversa.\n"
-        "ORDEM DO FUNIL (pule o que o cliente já respondeu; sempre 1 pergunta por vez e termine com '?'):\n"
-        "1) Após entregar fotos, link pedido ou endereço: pergunte o que a pessoa achou ou o que mais gostaria de ver.\n"
-        "2) Qualificação (uma pergunta por mensagem, nesta ordem):\n"
-        "   a) se a busca é para morar ou investir;\n"
-        "   b) qual o prazo em que pretende fechar/se mudar;\n"
-        "   c) qual a forma de pagamento pretendida (ex: financiamento, FGTS, recursos próprios ou imóvel na troca).\n"
-        "3) Oferecer visita com 2 opções de dia e horário (use estas sugestões atuais: "
-        f"{slots[0]} ou {slots[1]}), deixando claro que a Edicleia confirma o agendamento.\n"
-        "4) Só depois de oferecer a visita / confirmar interesse na visita: peça o nome completo (uma mensagem) e depois o WhatsApp (outra mensagem) explicando que a Edicleia entra em contato por lá para confirmar a visita e passar o complemento da unidade.\n"
-        "   - SE O LEAD PREFERIR NÃO PASSAR O TELEFONE NESSA ETAPA FINAL: não insista! Envie o link oficial do WhatsApp da Edicleia com uma mensagem pronta resumindo o interesse usando a tag [[WA_RESUMO: ...]] e encerre com 1 pergunta natural.\n"
-        "5) Fechamento (quando já tiver objetivo, prazo/pagamento, interesse em visita, nome completo e WhatsApp — ou quando na etapa final o lead preferir não passar o telefone): "
-        "confirme que vai passar tudo para a Edicleia chamar no WhatsApp (ou que ela já pode chamar pelo link abaixo com o resumo pronto) para confirmar a visita e passar o complemento da unidade, e faça uma pergunta separada no final (ex: '...Ficou mais alguma dúvida sobre o Triplex enquanto ela te chama?'). "
-        "SOMENTE nesse fechamento final (ou se na etapa final de pedir telefone o lead recusar informar o número), adicione nas últimas linhas exatamente neste formato:\n"
-        "[[WA_RESUMO: Olá, Edicleia! Vim pelo Instagram com interesse no <imóvel com bairro e valor>. Nome: <nome ou não informado>. Objetivo: <morar/investir>. Pagamento/Prazo: <detalhes>. Visita: <preferência de dia/horário>.]]\n"
-        "[[CRM_LEAD: {\"nome\":\"<nome completo>\",\"telefone\":\"<whatsapp ou vazio>\",\"objetivo\":\"<morar|investir|vender|avaliar>\",\"orcamento\":\"<forma de pagamento e prazo>\",\"imovel\":\"<nome/bairro/valor do imóvel>\",\"resumo\":\"<resumo curto com visita/horário, pagamento, prazo e objetivo>\"}]]\n"
-        "Não escreva a URL wa.me fora da tag [[WA_RESUMO: ...]] e NUNCA envie wa.me no início ou no meio da conversa.\n\n"
+        "- Nunca prometa algo que não esteja no cadastro (não prometa vídeo). Nunca escreva código prop- solto fora da URL oficial do site. Não peça documento, CPF ou RG.\n"
+        "- Nunca comece com 'Claro!' seguido de recusa (ex: nunca diga 'Por aqui não envio links').\n"
+        "- NUNCA passe o complemento 'sobrado 02' antes de a visita estar confirmada (explique que só é passado na confirmação da visita porque o imóvel é habitado).\n"
+        "- Faça no máximo UMA pergunta objetiva no final da mensagem (terminando com '?'), EXCETO no fechamento final após o cliente já ter enviado o WhatsApp (que pode encerrar agradecendo e confirmando o contato da Edicleia).\n"
+        f"ESTADO DAS FOTOS NESTA CONVERSA: FOTOS JÁ ENVIADAS = {photos_flag}.\n"
+        "FLUXO EXATO DO TRIPLEX (Uberaba de Cima, R$ 1.190.000):\n"
+        "1) ABERTURA / PRIMEIRA RESPOSTA COMPLETA DO TRIPLEX (quando o lead vier por qualquer botão do anúncio do Triplex — endereço, fotos ou condições — ou perguntar do Triplex pela primeira vez sem ter recebido a apresentação completa ainda):\n"
+        "   - Responda diretamente ao que o lead pediu logo na primeira frase (se pediu endereço, comece informando: "
+        "'Rua Júlio Wischral, 993, no Uberaba de Cima, a uns 50 m da Panificadora Akipão, farmácias e restaurantes, e a uma quadra da Rua Capitão Leônidas Marques', mantendo 'sobrado 02' retido).\n"
+        "   - E na MESMA resposta entregue a apresentação completa do Triplex (seja objetivo para caber em até ~820 caracteres):\n"
+        "     a) Fotos: se FOTOS JÁ ENVIADAS = NÃO, inclua [[ENVIAR_FOTOS: Triplex]] na última linha (as 3 fotos serão enviadas antes do texto). Se FOTOS JÁ ENVIADAS = SIM, não repita a tag.\n"
+        "     b) Introdução: 220 m² em 3 andares, 3 quartos (sendo 1 suíte), espaço gourmet com deck e garagem para 3 carros, no Uberaba de Cima, pertinho do Jardim das Américas.\n"
+        "     c) Condições e valor em tópicos curtos:\n"
+        "        • Valor: R$ 1.190.000\n"
+        "        • Aceita financiamento\n"
+        "        • Aceita apartamento como parte do pagamento (até 50% do valor)\n"
+        "        • Imóvel averbado, documentação ok\n"
+        "     d) Link do site para mais informações: https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995\n"
+        "     e) Pergunta final: 'Você gostaria de agendar uma visita para conhecer o Triplex?'\n"
+        "   - NÃO repita a saudação automática da Meta ('Olá! Que bom ver seu interesse...').\n"
+        "2) TURNOS SEGUINTES / DÚVIDAS ESPECÍFICAS:\n"
+        "   - Se nos turnos seguintes o lead fizer outra pergunta específica (ex.: permuta, quartos, localização, financiamento), responda de acordo com o contexto usando o cadastro, sem repetir o bloco inteiro da apresentação nem reenviar fotos já enviadas, e conduza para o agendamento da visita (ou peça nome completo e WhatsApp se já tiver topado visitar).\n"
+        "   - Se for corretor/corretora buscando parceria, registre no resumo e pergunte se já tem cliente interessado e qual o perfil/contato para a Edicleia alinhar.\n"
+        "3) SE O LEAD DISSER SIM (QUER AGENDAR VISITA / AVANÇAR):\n"
+        "   - Peça o nome completo e o número de WhatsApp para a corretora Edicleia agendar a visita (ex.: 'Perfeito! Para a corretora Edicleia agendar sua visita, me passa seu nome completo e número de WhatsApp?').\n"
+        "   - Se o lead já passou apenas um deles (ex.: já disse o nome, falta o WhatsApp), peça o que falta.\n"
+        "4) SE O LEAD JÁ ENVIOU O NÚMERO DE WHATSAPP DELA:\n"
+        "   - NUNCA envie o link wa.me/5541988024346! Como a pessoa já deixou o número dela, nós é que vamos entrar em contato.\n"
+        "   - Agradeça pelo nome (se houver) e confirme que o contato já foi encaminhado para a corretora Edicleia e que ela vai chamar no WhatsApp logo em seguida para agendar a visita (ex.: 'Perfeito, [Nome]! Acabei de encaminhar seu contato para a corretora Edicleia e ela já vai te chamar no WhatsApp para alinhar a sua visita. Obrigado!').\n"
+        "   - Adicione na última linha APENAS a tag [[CRM_LEAD: ...]] (SEM [[WA_RESUMO: ...]] e SEM link wa.me):\n"
+        "     [[CRM_LEAD: {\"nome\":\"<nome completo ou nome do perfil>\",\"telefone\":\"<whatsapp informado>\",\"objetivo\":\"<morar|vender|avaliar>\",\"orcamento\":\"<condições ou vazio>\",\"imovel\":\"<nome/bairro/valor do imóvel>\",\"resumo\":\"<resumo curto da conversa e interesse na visita>\"}]]\n"
+        "5) LINK DO WHATSAPP DA EBV (EXCEÇÃO ÚNICA):\n"
+        "   - Só envie [[WA_RESUMO: ...]] (que gera https://wa.me/5541988024346?text=...) se o cliente preferir NÃO informar o próprio número de telefone na etapa de contato ou pedir explicitamente o link do WhatsApp da EBV para ele mesmo chamar.\n"
+        "   - Nesse caso de recusa de telefone, envie:\n"
+        "     [[WA_RESUMO: Olá, Edicleia! Vim pelo Instagram com interesse no <imóvel com bairro e valor>. Nome: <nome ou não informado>. <resumo>.]]\n"
+        "     [[CRM_LEAD: {\"nome\":\"<nome ou vazio>\",\"telefone\":\"\",\"objetivo\":\"<morar|vender|avaliar>\",\"orcamento\":\"<detalhes>\",\"imovel\":\"<imóvel>\",\"resumo\":\"<resumo curto>\"}]]\n"
+        "CONTEXTO DE OUTROS IMÓVEIS E MENSAGENS ORGÂNICAS:\n"
+        "- Se citar outro bairro do resumo abaixo, fale dos imóveis daquele bairro seguindo a mesma lógica (dados do cadastro + link do site + convite para visita / nome e WhatsApp).\n"
+        "- Se for uma mensagem orgânica genérica sem contexto de imóvel nem saudação prévia do Triplex (ex.: apenas 'valor', 'endereço', 'fotos'), não presuma o Triplex: pergunte qual imóvel ou bairro a pessoa procura.\n\n"
         f"{origin}\n"
         f"Resumo por bairro, fonte do cadastro:\n{index}\n\n"
         f"Catálogo:\n{facts}\n\n"
         f"Conversa:\n{chat}\n\n"
-        "Escreva só a próxima mensagem da EBV (1 pergunta no final, terminando em '?', sem URLs de /media/ no texto)."
+        "Escreva só a próxima mensagem da EBV (sem URLs de /media/ no texto)."
     )
 
 
@@ -728,8 +872,15 @@ def call_hermes(prompt):
     return done.stdout or ""
 
 
-def luna_reply(turns, properties):
-    prompt = build_system_prompt(turns, properties)
+def has_real_ebv_reply(turns):
+    return any(
+        t.get("role") == "ebv" and t.get("text") and not is_auto_greeting(t.get("text"))
+        for t in (turns or [])
+    )
+
+
+def luna_reply(turns, properties, photos_sent=False):
+    prompt = build_system_prompt(turns, properties, photos_sent=photos_sent)
     stdout = call_hermes(prompt)
     if not stdout:
         return "", [], None, ""
@@ -738,7 +889,9 @@ def luna_reply(turns, properties):
     raw_reply, wa_link, wa_summary = extract_wa_link(raw_reply)
     raw_reply, photo_hint = extract_photo_tag(raw_reply)
     text, photos = take_photos(raw_reply, allowed)
-    if not photos and (photo_hint or "[[ENVIAR_FOTOS" in stdout.upper()):
+    last_cust_text = fold(next((t.get("text") for t in reversed(turns or []) if t.get("role") == "cliente" and t.get("text")), ""))
+    asked_photos = any(k in last_cust_text for k in ("foto", "fotos", "imagem", "imagens"))
+    if not photos and (photo_hint or "[[ENVIAR_FOTOS" in stdout.upper() or (not photos_sent and is_triplex_ad_context(turns) and not has_real_ebv_reply(turns))):
         prop = match_property_from_text(photo_hint, properties)
         if not prop:
             chat_blob = " ".join(str(t.get("text") or "") for t in (turns or []))
@@ -747,7 +900,22 @@ def luna_reply(turns, properties):
             prop = next((p for p in (properties or []) if p.get("id") == ACTIVE_AD_PROPERTY_ID), None)
         if prop:
             photos = [url for _label, url in chosen_shots(prop)][:3]
-    budget = 920 - (len(wa_link.encode("utf-8")) + 2 if wa_link else 0)
+    if photos_sent and not asked_photos:
+        photos = []
+    has_phone = lead_has_phone(turns, crm_lead)
+    ebv_asked_phone = any(
+        turn.get("role") == "ebv"
+        and any(w in fold(turn.get("text")) for w in ("whatsapp", "telefone", "numero"))
+        for turn in (turns or [])
+    )
+    wants_our_wa = any(k in last_cust_text for k in (
+        "seu whats", "whats da", "whatsapp da", "contato da corretora", "numero da",
+        "link do whats", "nao quero passar", "prefiro nao passar", "prefiro nao informar",
+        "sem telefone", "prefiro chamar", "eu chamo", "manda o seu", "passa o seu",
+    ))
+    if has_phone or not (ebv_asked_phone or wants_our_wa):
+        wa_link = ""
+    budget = 950 - (len(wa_link.encode("utf-8")) + 2 if wa_link else 0)
     body = sanitize(text, max_bytes=max(350, budget))
     if not body:
         return "", photos, None, ""
@@ -759,22 +927,37 @@ def luna_reply(turns, properties):
 def luna_followup(turns, properties, stage):
     chat = transcript(turns) or "Cliente: (sem texto)"
     origin = ad_note(turns)
-    slots = next_visit_slots()
+    triplex_ctx = is_triplex_ad_context(turns)
+    chat_blob = " ".join(str(t.get("text") or "") for t in (turns or []))
+    matched = match_property_from_text(chat_blob, properties)
+    if not matched and triplex_ctx:
+        matched = next((p for p in (properties or []) if p.get("id") == ACTIVE_AD_PROPERTY_ID), None)
+    prop_label = (
+        "Triplex 220 m² no Uberaba de Cima (R$ 1.190.000)"
+        if (matched and matched.get("id") == ACTIVE_AD_PROPERTY_ID) or triplex_ctx
+        else (f"{short_title(matched.get('title'))} ({brl(matched.get('price'))})".strip(" ()") if matched else "imóvel da EBV")
+    )
     if stage == 1:
         goal = (
-            "Envie um lembrete curto, educado e natural (~3h sem resposta do cliente), retomando o assunto do imóvel da conversa "
-            "(se for o Triplex no Uberaba de Cima, cite-o), sem ser invasivo, e termine com UMA pergunta simples (ex: se conseguiu ver as informações ou se ficou alguma dúvida sobre a localização/imóvel)."
+            "Envie o 1º lembrete curto, educado e natural (~3h sem resposta do cliente), retomando o imóvel da conversa "
+            "(se for o Triplex no Uberaba de Cima, cite o Triplex no Uberaba de Cima) e perguntando se ficou alguma dúvida "
+            "sobre o imóvel e se o valor e as condições estão dentro do que ele esperava "
+            "(ex.: 'Oi, [Nome]! Ficou alguma dúvida sobre o Triplex no Uberaba de Cima ou o valor e as condições estão dentro do que você esperava?'). "
+            "NUNCA pergunte 'morar ou investir', não repita a mesma frase anterior e NÃO envie link wa.me."
         )
     else:
         goal = (
-            "Envie a última tentativa gentil dentro da janela de 24h (~20h sem resposta), trazendo ALGO NOVO: "
-            f"ofereça 2 opções concretas de dia e horário para conhecer o imóvel ({slots[0]} ou {slots[1]}), "
-            "sem insistir caso não faça sentido agora, e termine com UMA pergunta (com '?')."
+            "Envie o 2º lembrete gentil dentro da janela de 24h (~20h sem resposta), convidando o cliente a abrir uma mensagem "
+            "direto com a corretora Edicleia no WhatsApp pelo link abaixo quando preferir. "
+            "NUNCA pergunte 'morar ou investir' e NÃO use colchetes ou sinais < > no resumo. "
+            "Na última linha, inclua exatamente:\n"
+            f"[[WA_RESUMO: Olá, Edicleia! Vim pelo Instagram e tenho interesse no {prop_label}.]]"
         )
     prompt = (
-        "Você conversa no Instagram Direct da EBV Imóveis Curitiba, como equipe da Edicleia Borba Vieira.\n"
+        "Você atua como pré-atendimento comercial (SDR) da corretora Edicleia Borba Vieira no Instagram Direct da EBV Imóveis Curitiba.\n"
         f"{goal}\n"
-        "REGRAS: Português do Brasil, máximo 2 frases, apenas UMA pergunta terminando com '?', "
+        "REGRAS: Português do Brasil, máximo 2 frases, "
+        "NUNCA pergunte 'morar ou investir', PROIBIDO perguntas vazias ('o que achou?', 'gostaria de ver algum outro detalhe?'), "
         "PROIBIDO citar código prop- solto ou o complemento 'sobrado 02', "
         "não prometa vídeo ou condição fora do cadastro.\n"
         f"{origin}\n"
@@ -785,7 +968,23 @@ def luna_followup(turns, properties, stage):
     if not stdout:
         return ""
     raw_reply, _ = extract_crm_lead(stdout)
-    return sanitize(raw_reply, max_bytes=700)
+    raw_reply, wa_link, wa_summary = extract_wa_link(raw_reply)
+    if stage == 1:
+        wa_link = ""
+    elif not wa_link or wa_link == f"https://wa.me/{EDICLEIA_WA}" or "<" in wa_summary or ">" in wa_summary:
+        default_summary = (
+            f"Olá, Edicleia! Vim pelo Instagram e tenho interesse no {prop_label}."
+            if matched or triplex_ctx else
+            "Olá, Edicleia! Vim pelo Instagram e gostaria de falar com você sobre um imóvel."
+        )
+        wa_link = build_wa_link(default_summary)
+    budget = 750 - (len(wa_link.encode("utf-8")) + 2 if wa_link else 0)
+    body = sanitize(raw_reply, max_bytes=max(320, budget))
+    if not body:
+        return ""
+    if wa_link:
+        return f"{body}\n\n{wa_link}"
+    return body
 
 
 def thread_turns(thread):
@@ -796,9 +995,11 @@ def thread_turns(thread):
         text = str(msg.get("message") or "").strip()
         created = parse_time(msg.get("created_time"))
         referral = msg.get("referral") if isinstance(msg.get("referral"), dict) else None
+        atts = msg.get("attachments")
+        has_photos = bool((atts.get("data") if isinstance(atts, dict) else atts))
         if not sender or not msg.get("id") or not created:
             continue
-        if not text and not referral:
+        if not text and not referral and not has_photos:
             continue
         found.append({
             "id": str(msg["id"]),
@@ -807,6 +1008,7 @@ def thread_turns(thread):
             "text": text,
             "at": created,
             "referral": referral,
+            "has_photos": has_photos,
         })
     found.sort(key=lambda item: item["at"])
     return found
@@ -836,7 +1038,9 @@ def due_followup_stage(all_turns, state, thread_id, current_time=None):
     last_cust = cust_turns[-1]
     if last_cust["at"] < followup_since:
         return 0, None
-    if last_cust["from"] in set(state.get("qualified") or []):
+    if last_cust["from"] in set(state.get("qualified") or []) or last_cust["from"] in set(state.get("skip_followup") or []):
+        return 0, None
+    if lead_has_phone(all_turns):
         return 0, None
     if is_auto_greeting(last_cust.get("text")) or is_handoff_complete(last_turn.get("text")):
         return 0, None
@@ -878,7 +1082,7 @@ def send_direct_bundle(token, recipient_id, reply, photos):
 
 def cycle(token, state):
     body, status = request_json(
-        GRAPH + "/me/conversations?fields=id,updated_time,messages.limit(15){id,message,from,created_time,referral}&limit=20",
+        GRAPH + "/me/conversations?fields=id,updated_time,participants,messages.limit(20){id,message,from,created_time,referral,attachments}&limit=20",
         token,
     )
     if body is None:
@@ -900,15 +1104,21 @@ def cycle(token, state):
         if updated and updated < since:
             continue
         all_turns = thread_turns(thread)
+        profile = instagram_profile(thread, token, state)
+        sync_crm_thread(thread, all_turns, profile, properties, state)
         turns = [item for item in all_turns if current - item["at"] <= WINDOW]
         fresh = [item for item in turns if item["role"] == "cliente" and item["at"] >= since and item.get("text")]
+        photos_already_sent = (
+            (thread_id in set(state.get("photos_sent") or []))
+            or any(item.get("has_photos") for item in all_turns if item.get("role") == "ebv")
+        )
         if fresh:
             latest = fresh[-1]
             seen += 1
             if latest["id"] not in replied and latest["id"] not in failed and latest["id"] not in pending:
                 if sent >= 3:
                     continue
-                reply, photos, crm_lead, wa_summary = luna_reply(turns, properties)
+                reply, photos, crm_lead, wa_summary = luna_reply(turns, properties, photos_sent=photos_already_sent)
                 if not reply:
                     print("direct empty_reply", flush=True)
                     continue
@@ -917,8 +1127,11 @@ def cycle(token, state):
                 result, send_status = send_direct_bundle(token, latest["from"], reply, photos)
                 if result and result.get("message_id"):
                     state.setdefault("replied", []).append(latest["id"])
-                    if crm_lead:
-                        state.setdefault("qualified", []).append(latest["from"])
+                    if photos and thread_id and thread_id not in (state.get("photos_sent") or []):
+                        state.setdefault("photos_sent", []).append(thread_id)
+                    if crm_lead or lead_has_phone(turns, crm_lead):
+                        if latest["from"] not in (state.get("qualified") or []):
+                            state.setdefault("qualified", []).append(latest["from"])
                     save_state(state)
                     sent += 1
                     print("direct sent", flush=True)
