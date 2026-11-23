@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Montserrat:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap">
 
   <!-- Stylesheets with Cache Busting -->
-  <link rel="stylesheet" href="styles.css?v=20261123_message">
+  <link rel="stylesheet" href="styles.css?v=20261123_seo">
   <link rel="stylesheet" href="crm.css?v=20261123_mobile">
 
   <!-- Favicons -->
@@ -23,7 +23,7 @@
   <meta name="theme-color" content="#722F37">
 
   <!-- Preload Hero Image with High Priority -->
-  <link rel="preload" as="image" href="assets/hero_bg.jpg" fetchpriority="high">
+  <link rel="preload" as="image" href="assets/hero_bg.webp" type="image/webp" fetchpriority="high">
 
   <!-- SEO Title & Description -->
   <title>EBV Imóveis | Corretora em Curitiba - Imóveis de Alto Padrão</title>
@@ -146,6 +146,21 @@
     ]
   }
   </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "@id": "https://ebvimoveiscuritiba.com.br/#faq",
+    "mainEntity": [
+      {"@type": "Question", "name": "Como agendar uma visita a um imóvel?", "acceptedAnswer": {"@type": "Answer", "text": "Abra a página do imóvel e toque em falar no WhatsApp, ou chame direto no WhatsApp da Edicleia (41) 98802-4346. A visita é combinada no dia e horário que for melhor para você."}},
+      {"@type": "Question", "name": "Os imóveis aceitam financiamento ou outro imóvel como parte do pagamento?", "acceptedAnswer": {"@type": "Answer", "text": "As condições variam de imóvel para imóvel e aparecem na descrição de cada anúncio. Para confirmar financiamento, entrada ou permuta em um imóvel específico, fale com a Edicleia pelo WhatsApp."}},
+      {"@type": "Question", "name": "Vocês fazem avaliação do meu imóvel?", "acceptedAnswer": {"@type": "Answer", "text": "Sim. A avaliação é feita com estudo comparativo de mercado, por corretora e avaliadora imobiliária com registro CRECI-PR 14269."}},
+      {"@type": "Question", "name": "Quero vender meu imóvel. Como funciona?", "acceptedAnswer": {"@type": "Answer", "text": "A EBV cuida da divulgação profissional, da qualificação dos compradores e da condução da negociação até o fechamento. O primeiro passo é uma conversa pelo WhatsApp para conhecer o imóvel."}},
+      {"@type": "Question", "name": "Em quais regiões a EBV Imóveis atende?", "acceptedAnswer": {"@type": "Answer", "text": "Curitiba e Região Metropolitana."}},
+      {"@type": "Question", "name": "Quem é a corretora responsável?", "acceptedAnswer": {"@type": "Answer", "text": "Edicleia Borba Vieira, corretora de imóveis e avaliadora imobiliária, CRECI-PR 14269, com mais de 25 anos de experiência no mercado de Curitiba."}}
+    ]
+  }
+  </script>
 </head>
 <body>
 
@@ -154,7 +169,7 @@
     <div class="nav-container">
       <div class="brand" onclick="navigateTo('home')">
         <!-- Logo Oficial: Chave com Asas de Borboleta -->
-        <img src="assets/logo_icon.png" alt="EBV Imóveis" class="brand-logo-img">
+        <img src="assets/logo_icon.webp" alt="EBV Imóveis" class="brand-logo-img" width="50" height="50">
         <div class="brand-text">
           <span class="brand-title">EBV Imóveis</span>
           <span class="brand-subtitle">Curitiba</span>
@@ -284,7 +299,7 @@
       <section id="human-cta">
         <div class="about-container">
           <div class="about-photo-wrapper">
-            <img src="assets/edicleia_profile.jpg" alt="Edicleia Borba Vieira - Corretora de Imóveis" class="about-photo" loading="lazy" decoding="async">
+            <img src="assets/edicleia_profile.webp" srcset="assets/edicleia_profile-640.webp 640w, assets/edicleia_profile.webp 1600w" sizes="(max-width: 700px) 100vw, 480px" alt="Edicleia Borba Vieira - Corretora de Imóveis" class="about-photo" loading="lazy" decoding="async">
           </div>
           <div class="about-details">
             <span class="section-tagline">Trabalho, Dedicação & Confiança</span>
@@ -298,6 +313,40 @@
               <button class="btn-primary" onclick="navigateTo('sobre')">Saiba Mais Sobre Minha Trajetória</button>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- Perguntas Frequentes (texto espelhado no JSON-LD FAQPage do <head>) -->
+      <section id="faq" class="faq-section" aria-labelledby="faq-title">
+        <div class="section-header">
+          <span class="section-tagline">Dúvidas Comuns</span>
+          <h2 id="faq-title">Perguntas Frequentes</h2>
+        </div>
+        <div class="faq-list">
+          <details class="faq-item">
+            <summary>Como agendar uma visita a um imóvel?</summary>
+            <p>Abra a página do imóvel e toque em falar no WhatsApp, ou chame direto no <a href="https://wa.me/5541988024346" target="_blank" rel="noopener">WhatsApp da Edicleia (41) 98802-4346</a>. A visita é combinada no dia e horário que for melhor para você.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Os imóveis aceitam financiamento ou outro imóvel como parte do pagamento?</summary>
+            <p>As condições variam de imóvel para imóvel e aparecem na descrição de cada anúncio. Para confirmar financiamento, entrada ou permuta em um imóvel específico, fale com a Edicleia pelo WhatsApp.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Vocês fazem avaliação do meu imóvel?</summary>
+            <p>Sim. A avaliação é feita com estudo comparativo de mercado, por corretora e avaliadora imobiliária com registro CRECI-PR 14269. Peça pela <a href="#avaliacao" onclick="navigateTo('avaliacao'); return false;">página de avaliação de imóveis</a>.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Quero vender meu imóvel. Como funciona?</summary>
+            <p>A EBV cuida da divulgação profissional, da qualificação dos compradores e da condução da negociação até o fechamento. O primeiro passo é uma conversa pelo WhatsApp para conhecer o imóvel.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Em quais regiões a EBV Imóveis atende?</summary>
+            <p>Curitiba e Região Metropolitana. Veja os <a href="#imoveis" onclick="navigateTo('imoveis'); return false;">imóveis à venda em Curitiba</a> disponíveis agora.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Quem é a corretora responsável?</summary>
+            <p>Edicleia Borba Vieira, corretora de imóveis e avaliadora imobiliária, CRECI-PR 14269, com mais de 25 anos de experiência no mercado de Curitiba.</p>
+          </details>
         </div>
       </section>
     </div>
@@ -435,7 +484,7 @@
       <section>
         <div class="about-container">
           <div class="about-photo-wrapper">
-            <img src="assets/edicleia_profile.jpg" alt="Edicleia Borba Vieira - Corretora de Imóveis" class="about-photo" loading="lazy" decoding="async">
+            <img src="assets/edicleia_profile.webp" srcset="assets/edicleia_profile-640.webp 640w, assets/edicleia_profile.webp 1600w" sizes="(max-width: 700px) 100vw, 480px" alt="Edicleia Borba Vieira - Corretora de Imóveis" class="about-photo" loading="lazy" decoding="async">
           </div>
           <div class="about-details">
             <span class="section-tagline">Sobre a Corretora</span>
@@ -739,7 +788,7 @@
               <label class="crm-btn">Importar clientes (CSV)
                 <input type="file" id="leads-import-file" accept=".csv,.txt,text/csv" hidden>
               </label>
-              <a href="/api/admin/leads/audience.csv" download class="crm-btn">Público para a Meta</a>
+              <a href="/api/admin/leads/audience.csv" download rel="nofollow noindex" class="crm-btn">Público para a Meta</a>
             </div>
           </div>
 
@@ -863,7 +912,7 @@
         <!-- Contact Footer -->
         <div class="modal-footer-contact">
           <div class="broker-card-mini">
-            <img src="assets/edicleia_profile.jpg" alt="Edicleia Borba Vieira" loading="lazy" decoding="async">
+            <img src="assets/edicleia_profile.webp" srcset="assets/edicleia_profile-640.webp 640w, assets/edicleia_profile.webp 1600w" sizes="(max-width: 700px) 100vw, 480px" alt="Edicleia Borba Vieira" loading="lazy" decoding="async">
             <div>
               <h4>Edicleia Borba Vieira</h4>
               <p>Corretora de Imóveis • CRECI 14269</p>
@@ -884,7 +933,7 @@
       <div class="footer-brand">
         <div class="brand">
           <!-- Logo Clone for Footer -->
-          <img src="assets/logo_icon.png" alt="EBV Imóveis" class="brand-logo-img" style="filter: brightness(0) invert(1); width: 40px; height: 40px;">
+          <img src="assets/logo_icon.webp" alt="EBV Imóveis" class="brand-logo-img" width="40" height="40" loading="lazy" style="filter: brightness(0) invert(1); width: 40px; height: 40px;">
           <div class="brand-text">
             <span class="brand-title" style="color: var(--bg-clean);">EBV Imóveis</span>
             <span class="brand-subtitle">Curitiba</span>
@@ -949,7 +998,7 @@
     <div class="modal-container" style="max-width: 400px; padding: 40px;">
       <button class="modal-close" onclick="closeLoginModal()">&times;</button>
       <div style="text-align: center; margin-bottom: 30px;">
-        <img src="assets/logo_icon.png" alt="EBV Imóveis" style="height: 60px; margin-bottom: 15px;">
+        <img src="assets/logo_icon.webp" alt="EBV Imóveis" width="41" height="60" loading="lazy" style="height: 60px; margin-bottom: 15px;">
         <h3 style="font-family: var(--font-title); font-size: 1.6rem; color: var(--primary-color);">Área Restrita</h3>
         <p style="font-size: 0.85rem; color: var(--text-light);">Insira suas credenciais de acesso</p>
       </div>
@@ -996,7 +1045,7 @@
   </div>
 
   <script src="tracking.js?v=20261119_fast"></script>
-  <script src="app.js?v=20261123_message"></script>
+  <script src="app.js?v=20261123_seo"></script>
   <script src="crm-app.js?v=20261123_mobile"></script>
 
   <!-- Botão Flutuante de WhatsApp Oficial -->

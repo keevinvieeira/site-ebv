@@ -236,6 +236,7 @@ main {
   margin: 0 !important;
   padding: 100px 20px 40px;
   background-image: linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.55)), url('assets/hero_bg.jpg');
+  background-image: linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.55)), url('assets/hero_bg.webp');
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;
@@ -2395,4 +2396,40 @@ footer {
 .footer-contact-link:hover {
   color: var(--bg-clean);
   text-decoration: underline;
+}
+
+/* ---------- Perguntas Frequentes (FAQ) ---------- */
+.faq-section { max-width: 900px; margin: 0 auto; }
+.faq-list { display: flex; flex-direction: column; gap: 12px; }
+.faq-item {
+  background: var(--bg-clean, #fff);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 0 20px;
+}
+.faq-item summary {
+  cursor: pointer;
+  list-style: none;
+  min-height: 44px;
+  padding: 18px 28px 18px 0;
+  position: relative;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary::after {
+  content: "+";
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.4rem;
+  color: var(--primary-color);
+}
+.faq-item[open] summary::after { content: "–"; }
+.faq-item p { margin: 0 0 18px; color: var(--text-light); line-height: 1.6; }
+.faq-item a { color: var(--primary-color); text-decoration: underline; }
+@media (max-width: 600px) {
+  .faq-item { padding: 0 16px; }
+  .faq-item summary { font-size: 1rem; }
 }

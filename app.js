@@ -721,10 +721,14 @@ function createPropertyCard(prop) {
   const safeType = escapeHTML(capitalize(prop.type));
   const safeImage = escapeHTML(prop.image);
   const safeUrl = escapeHTML(propertyUrl(prop));
+  const cardWebp = webpVariant(prop.image);
+  const imgAttrs = cardWebp
+    ? `src="${escapeHTML(cardWebp)}" srcset="${escapeHTML(webpVariant(prop.image, "-640"))} 640w, ${escapeHTML(cardWebp)} 1600w" sizes="(max-width: 700px) 100vw, 420px" data-fallback="${safeImage}"`
+    : `src="${safeImage}"`;
 
   card.innerHTML = `
     <a class="property-img-wrapper property-detail-link" href="${safeUrl}" data-property-link title="Ver página deste imóvel">
-      <img src="${safeImage}" alt="${safeTitle}" class="property-img" onerror="this.src='assets/sobrado_real.jpg'">
+      <img ${imgAttrs} alt="${safeTitle}" class="property-img" loading="lazy" decoding="async" onerror="ebvImgFallback(this)">
       <span class="property-badge-status">Comprar</span>
       <span class="property-badge-type">${safeType}</span>
     </a>
@@ -777,6 +781,30 @@ function propertyUrl(prop) {
 function capitalize(str) {
   if (!str) return "";
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// Performance: fotos locais (assets/*.jpg) têm versões WebP leves (cheia e 640w).
+// O JPG original continua no servidor e é usado se o WebP falhar.
+function webpVariant(src, suffix = "") {
+  const m = /^(\/?assets\/[\w-]+)\.jpe?g$/i.exec(String(src || ""));
+  return m ? `${m[1]}${suffix}.webp` : null;
+}
+
+function setOptimizedSrc(img, src, suffix = "") {
+  const webp = webpVariant(src, suffix);
+  img.onerror = webp ? () => { img.onerror = null; img.src = src; } : null;
+  img.src = webp || src;
+}
+
+function ebvImgFallback(img) {
+  const fallback = img.dataset.fallback;
+  if (img.hasAttribute("srcset") && fallback) {
+    img.removeAttribute("srcset");
+    img.src = fallback;
+    return;
+  }
+  img.onerror = null;
+  img.src = "assets/sobrado_real.jpg";
 }
 
 // Security: HTML Escaping helper to sanitize user-provided values before DOM insertion
@@ -1006,7 +1034,9 @@ function openPropertyModal(id, standalone = false) {
     thumbsContainer.style.display = "flex";
     currentModalImages.forEach((imgSrc, idx) => {
       const thumb = document.createElement("img");
-      thumb.src = imgSrc;
+      setOptimizedSrc(thumb, imgSrc, "-640");
+      thumb.alt = `${prop.title} - foto ${idx + 1}`;
+      thumb.loading = "lazy";
       thumb.className = "modal-thumb" + (idx === 0 ? " active" : "");
       thumb.onclick = () => selectModalPhoto(idx);
       thumbsContainer.appendChild(thumb);
@@ -1091,7 +1121,7 @@ function changeModalPhoto(offset) {
 function updateModalPhoto() {
   const modalImg = document.getElementById("modal-image");
   if (modalImg && currentModalImages[currentModalPhotoIndex]) {
-    modalImg.src = currentModalImages[currentModalPhotoIndex];
+    setOptimizedSrc(modalImg, currentModalImages[currentModalPhotoIndex]);
   }
 
   const thumbs = document.querySelectorAll(".modal-thumb");
@@ -1113,7 +1143,7 @@ function openFullscreenViewer() {
   const counter = document.getElementById("fullscreen-counter");
   
   if (viewer && viewerImg) {
-    viewerImg.src = currentModalImages[currentModalPhotoIndex];
+    setOptimizedSrc(viewerImg, currentModalImages[currentModalPhotoIndex]);
     if (counter) {
       counter.textContent = `${currentModalPhotoIndex + 1} / ${currentModalImages.length}`;
     }
@@ -1143,7 +1173,7 @@ function changeFullscreenPhoto(offset) {
   const viewerImg = document.getElementById("fullscreen-image");
   const counter = document.getElementById("fullscreen-counter");
   if (viewerImg) {
-    viewerImg.src = currentModalImages[currentModalPhotoIndex];
+    setOptimizedSrc(viewerImg, currentModalImages[currentModalPhotoIndex]);
   }
   if (counter) {
     counter.textContent = `${currentModalPhotoIndex + 1} / ${currentModalImages.length}`;
@@ -1442,7 +1472,7 @@ function renderAdminPhotoGallery() {
     card.title = "Segure e arraste para ordenar a sequência das fotos";
 
     const img = document.createElement("img");
-    img.src = imgSrc;
+    setOptimizedSrc(img, imgSrc, "-640");
     img.alt = `Foto ${idx + 1}`;
     img.loading = "lazy";
     img.draggable = false; // Prevent native image ghost drag

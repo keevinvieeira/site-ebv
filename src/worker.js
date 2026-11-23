@@ -247,6 +247,8 @@ async function handlePropertyPage(request, env, url) {
   const description = propertySummary(property);
   const mainImagePath = property.image || (Array.isArray(property.images) && property.images[0]) || "/assets/hero_bg.jpg";
   const image = new URL(mainImagePath, `${url.origin}/`).href;
+  // Fotos locais têm versão WebP leve; og:image continua em JPG (redes sociais).
+  const displayImagePath = String(mainImagePath).replace(/^(\/?assets\/[\w-]+)\.jpe?g$/i, "$1.webp");
   const canonicalUrl = `${url.origin}${url.pathname}`;
   const bootstrapJson = JSON.stringify(property)
     .replace(/</g, "\\u003c")
@@ -257,8 +259,8 @@ async function handlePropertyPage(request, env, url) {
 
   html = html
     .replace(
-      /<link\s+rel="preload"\s+as="image"\s+href="assets\/hero_bg\.jpg"[^>]*>/i,
-      `<link rel="preload" as="image" href="${escapeAttribute(mainImagePath)}" fetchpriority="high">`,
+      /<link\s+rel="preload"\s+as="image"\s+href="assets\/hero_bg\.(?:jpg|webp)"[^>]*>/i,
+      `<link rel="preload" as="image" href="${escapeAttribute(displayImagePath)}" fetchpriority="high">`,
     )
     .replace(/<title>[^<]*<\/title>/i, `<title>${escapeAttribute(title)}</title>`)
     .replace(
@@ -299,7 +301,7 @@ async function handlePropertyPage(request, env, url) {
     })
     .on("#modal-image", {
       element(el) {
-        el.setAttribute("src", mainImagePath);
+        el.setAttribute("src", displayImagePath);
         if (property.title) el.setAttribute("alt", String(property.title));
       },
     })
