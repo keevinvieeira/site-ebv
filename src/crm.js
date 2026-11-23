@@ -325,6 +325,8 @@ export async function handleAgentApi(request, env, ctx, path, method, readBody, 
     const propertyId = str(b.propertyId, 200) || null;
     const propertyTitle = str(b.propertyTitle, 200) || null;
     const adTitle = str(b.adTitle, 200);
+    const visitRequested = Boolean(b.visitRequested);
+    const visitWhen = str(b.visitWhen, 200);
     const now = new Date().toISOString();
     let conv = await env.DB.prepare("SELECT * FROM sdr_conversations WHERE channel = 'instagram' AND external_id = ?")
       .bind(externalId).first();
@@ -381,6 +383,7 @@ export async function handleAgentApi(request, env, ctx, path, method, readBody, 
       propertyId,
       propertyTitle,
       adTitle,
+      visita: visitRequested ? "sim" : (safeJson(conv.qualificacao, {}).visita || ""),
     };
     let saved = null;
     if (qualified && contactId) {
@@ -397,6 +400,24 @@ export async function handleAgentApi(request, env, ctx, path, method, readBody, 
       });
       qualification.leadId = saved.id;
       qualification.stage = "qualificado";
+      if (visitRequested) {
+        const existingVisit = await env.DB.prepare(
+          "SELECT id FROM visit_requests WHERE conversation_id = ? AND COALESCE(property_id, '') = ? LIMIT 1",
+        ).bind(conv.id, propertyId || "").first();
+        if (!existingVisit) {
+          await env.DB.prepare(
+            `INSERT INTO visit_requests (id, contact_id, conversation_id, lead_id, property_id, property_title, when_text, status, created_at, decided_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'pendente', ?, NULL)`,
+          ).bind(crypto.randomUUID(), contactId, conv.id, saved.id, propertyId, propertyTitle, visitWhen || null, now).run();
+          await createTask(env, {
+            contactId,
+            leadId: saved.id,
+            title: `Aprovar visita: ${propertyTitle || "imóvel do Instagram"}`,
+            dueAt: now,
+            origin: "sdr",
+          });
+        }
+      }
     }
     await env.DB.prepare(
       "UPDATE sdr_conversations SET contact_id = ?, qualificacao = ?, next_step = ?, last_inbound_at = ?, updated_at = ? WHERE id = ?",

@@ -162,6 +162,12 @@ class DirectLoopTests(unittest.TestCase):
         ]
         self.assertEqual(dl.due_followup_stage(phone_turns, state, "t2", base + timedelta(hours=4))[0], 0)
 
+        local_phone_turns = [
+            {"id": "c3", "from": "u3", "role": "cliente", "text": "99873-2272", "at": base + timedelta(minutes=1)},
+            {"id": "e3", "from": "ebv", "role": "ebv", "text": "Obrigado, encaminhei para a corretora!", "at": base + timedelta(minutes=2)},
+        ]
+        self.assertEqual(dl.due_followup_stage(local_phone_turns, state, "t3", base + timedelta(hours=4))[0], 0)
+
     def test_phone_detection_ignores_property_ids_and_prices(self):
         self.assertEqual(dl.extract_phone("+5541998952095"), "41998952095")
         self.assertEqual(dl.extract_phone("Meu whats é (41) 99895-2095"), "41998952095")
@@ -187,6 +193,22 @@ class DirectLoopTests(unittest.TestCase):
         self.assertEqual(payload["profileName"], "Elisangela Moreira")
         self.assertEqual(payload["phone"], "41998732272")
         self.assertTrue(payload["qualified"])
+
+    def test_crm_sync_marks_visit_from_customer_history(self):
+        state = {"profiles": {}, "synced": {}, "qualified": []}
+        thread = {"id": "thread2", "updated_time": "2026-11-23T12:00:00+0000"}
+        profile = {"id": "1888631988796569", "username": "eduardotourinhogomes", "name": "Eduardo Tourinho Gomes"}
+        turns = [
+            {"id": "m1", "role": "cliente", "text": "Quero saber condições e agendar visita no Triplex do Uberaba", "at": datetime(2026, 11, 22, 21, 42, tzinfo=timezone.utc)},
+            {"id": "m2", "role": "cliente", "text": "+5541998952095", "at": datetime(2026, 11, 23, 0, 28, tzinfo=timezone.utc)},
+        ]
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"ok":true}'
+        with mock.patch.object(dl, "read_agent_token", return_value="a" * 32), mock.patch.object(dl.urllib.request, "urlopen", return_value=response) as opened, mock.patch.object(dl, "save_state"):
+            self.assertTrue(dl.sync_crm_thread(thread, turns, profile, SAMPLE_CATALOG, state, force=True))
+        payload = json.loads(opened.call_args.args[0].data.decode("utf-8"))
+        self.assertTrue(payload["visitRequested"])
+        self.assertEqual(payload["propertyId"], "prop-1792252762995")
 
     def test_local_curitiba_phone_without_area_code(self):
         self.assertEqual(dl.extract_phone("99873-2272"), "41998732272")

@@ -280,6 +280,24 @@ def lead_has_phone(turns, crm_lead=None):
     return False
 
 
+def visit_request_from_turns(turns):
+    patterns = (
+        r"\b(?:agendar|marcar)\s+(?:uma\s+)?visita\b",
+        r"\b(?:quero|gostaria|podemos|posso)\b.{0,48}\b(?:visitar|visita|conhecer)\b",
+    )
+    for turn in reversed(turns or []):
+        if turn.get("role") != "cliente":
+            continue
+        text = fold(turn.get("text"))
+        if any(re.search(pattern, text) for pattern in patterns):
+            when = re.search(
+                r"\b(?:hoje|amanha|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado|domingo)(?:\s+(?:as\s+)?\d{1,2}(?::\d{2})?h?)?\b",
+                text,
+            )
+            return {"requested": True, "when": when.group(0) if when else ""}
+    return {"requested": False, "when": ""}
+
+
 def sanitize(text, max_bytes=950):
     value = strip_urls(text)
     value = re.sub(r"(?<!/imovel/)\bprop-[\w-]+\b", "", value, flags=re.IGNORECASE)
@@ -674,6 +692,7 @@ def sync_crm_thread(thread, turns, profile, properties, state, force=False):
     prop = match_property_from_text(chat_blob, properties)
     if not prop and is_triplex_ad_context(turns):
         prop = next((p for p in (properties or []) if p.get("id") == ACTIVE_AD_PROPERTY_ID), None)
+    visit = visit_request_from_turns(turns)
     payload = {
         "externalId": external_id,
         "username": profile.get("username") or "",
@@ -683,6 +702,8 @@ def sync_crm_thread(thread, turns, profile, properties, state, force=False):
         "propertyId": str(prop.get("id") or "") if prop else "",
         "propertyTitle": short_title(prop.get("title")) if prop else "",
         "adTitle": ad_title_from(turns),
+        "visitRequested": visit["requested"],
+        "visitWhen": visit["when"],
         "messages": [{
             "externalMid": t.get("id") or "",
             "direction": "out" if t.get("role") == "ebv" else "in",
