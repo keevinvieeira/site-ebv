@@ -62,14 +62,42 @@ class DirectLoopTests(unittest.TestCase):
                 "Veja no site: https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995 "
                 "ou chame no https://wa.me/5541988024346?text=Oi%20Edicleia. Quer saber mais?"
             ),
-            "Veja no site: https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995 "
-            "ou chame no https://wa.me/5541988024346?text=Oi%20Edicleia. Quer saber mais?",
+            "Veja no site:\n\nhttps://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995\n\n"
+            "ou chame no\n\nhttps://wa.me/5541988024346?text=Oi%20Edicleia\n\nQuer saber mais?",
         )
         self.assertEqual(
             dl.sanitize("Rua Júlio Wischral, 993, sobrado 02, foto https://ebvimoveiscuritiba.com.br/media/photos/a.jpg e https://outrosite.com/x"),
             "Rua Júlio Wischral, 993, foto e",
         )
         self.assertEqual(dl.sanitize("O código é prop-1792252762995"), "")
+
+    def test_links_go_alone_on_own_line_clickable_in_instagram(self):
+        site = "https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995"
+        cases = [
+            "Mais detalhes em [site da EBV](https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995).",
+            "Mais detalhes em ebvimoveiscuritiba.com.br/imovel/prop-1792252762995, é só abrir.",
+            "Mais detalhes em www.ebvimoveiscuritiba.com.br/imovel/prop-1792252762995!",
+            "Mais detalhes em (http://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995).",
+            "Mais detalhes em <https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995>.",
+        ]
+        for raw in cases:
+            out = dl.sanitize(raw)
+            lines = out.splitlines()
+            self.assertIn(site, lines, raw)
+            i = lines.index(site)
+            self.assertEqual(lines[i - 1], "", raw)
+            if i + 1 < len(lines):
+                self.assertEqual(lines[i + 1], "", raw)
+            self.assertNotIn("](", out)
+        # URL de imóvel nunca é bloqueada e o wa.me continua codificado (sem espaço).
+        wa = dl.build_wa_link("Olá, Edicleia! Vim pelo Instagram e tenho interesse no Triplex (R$ 1.190.000).")
+        self.assertNotIn(" ", wa)
+        self.assertIn("%20", wa)
+        self.assertIn(wa, dl.sanitize(f"Chame aqui: {wa}.").splitlines())
+        # Corte por tamanho nunca deixa link pela metade.
+        long_text = ("palavra " * 140) + site
+        cut = dl.sanitize(long_text, max_bytes=1000)
+        self.assertFalse(any(l.startswith("https://") and l != site for l in cut.splitlines()))
 
     def test_extract_crm_and_wa_link_work_together(self):
         raw = (
@@ -229,6 +257,7 @@ class DirectLoopTests(unittest.TestCase):
             reply, photos, crm, _ = dl.luna_reply(turns_open, SAMPLE_CATALOG, photos_sent=False)
         self.assertEqual(len(photos), 3)
         self.assertIn("• Valor: R$ 1.190.000", reply)
+        self.assertIn("\n\nhttps://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995\n\n", reply)
         self.assertNotIn("wa.me", reply)
         self.assertIsNone(crm)
 
@@ -245,6 +274,9 @@ class DirectLoopTests(unittest.TestCase):
             reply2, photos2, crm2, _ = dl.luna_reply(turns_phone, SAMPLE_CATALOG, photos_sent=True)
         self.assertEqual(photos2, [])
         self.assertNotIn("wa.me", reply2)
+        with mock.patch.object(dl, "call_hermes", return_value=fake_handoff.replace("Obrigado!", "Obrigado! https://wa.me/5541988024346")):
+            reply2b, _, _, _ = dl.luna_reply(turns_phone, SAMPLE_CATALOG, photos_sent=True)
+        self.assertNotIn("wa.me", reply2b)
         self.assertIsInstance(crm2, dict)
         self.assertEqual(crm2["nome"], "Eduardo Tourinho Gomes")
 
@@ -275,6 +307,9 @@ class DirectLoopTests(unittest.TestCase):
         with mock.patch.object(dl, "call_hermes", return_value="Oi! Se preferir, chame a corretora Edicleia direto no WhatsApp quando quiser:\n[[WA_RESUMO: Olá, Edicleia! Interesse no <imóvel>.]]"):
             fu2 = dl.luna_followup(turns, SAMPLE_CATALOG, stage=2)
         self.assertIn("https://wa.me/5541988024346?text=", fu2)
+        self.assertTrue(fu2.splitlines()[-1].startswith("https://wa.me/5541988024346?text="))
+        self.assertEqual(fu2.splitlines()[-2], "")
+        self.assertNotIn(" ", fu2.splitlines()[-1])
         self.assertNotIn("%3C", fu2)
         self.assertIn("Triplex", fu2)
 

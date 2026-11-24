@@ -225,14 +225,63 @@ def normalize_whitespace(text):
 def strip_urls(text):
     def _keep_or_drop(match):
         token = match.group(0)
-        trimmed = token.rstrip(".,;:!?)\"'`”")
+        trimmed = token.rstrip(".,;:!?)]}>\"'`”’*_")
         suffix = token[len(trimmed):]
-        normalized = trimmed if trimmed.lower().startswith("http") else f"https://{trimmed}"
+        normalized = full_url(trimmed)
         if is_allowed_url(normalized):
-            return trimmed + suffix
+            return normalized + suffix
         return " "
 
-    cleaned = re.sub(r"(?:https?://|www\.|wa\.me/)\S+", _keep_or_drop, str(text or ""), flags=re.IGNORECASE)
+    value = str(text or "")
+    # Markdown [texto](url) não vira link no Instagram: deixa só "texto" e a URL pura.
+    value = re.sub(r"\[([^\]\n]{1,120})\]\(\s*([^)\s]+)\s*\)", r"\1 \2", value)
+    value = re.sub(r"<((?:https?://|www\.|wa\.me/)[^>\s]+)>", r"\1", value, flags=re.IGNORECASE)
+    cleaned = re.sub(
+        r"(?:https?://|www\.|wa\.me/|ebvimoveiscuritiba\.com\.br\b)\S*",
+        _keep_or_drop,
+        value,
+        flags=re.IGNORECASE,
+    )
+    return normalize_whitespace(cleaned)
+
+
+def full_url(raw):
+    value = str(raw or "").strip()
+    if re.match(r"https?://", value, flags=re.IGNORECASE):
+        return re.sub(r"^http://", "https://", value, flags=re.IGNORECASE)
+    if value.lower().startswith("www."):
+        value = value[4:]
+    return "https://" + value
+
+
+URL_LINE_RE = re.compile(r"https://\S+")
+
+
+def isolate_urls(text):
+    """No app do Instagram, link no meio da frase ou com pontuação colada costuma não ficar
+    clicável. Cada URL vai sozinha numa linha, com uma linha em branco antes e depois."""
+    out = []
+    for line in str(text or "").splitlines():
+        if not URL_LINE_RE.search(line):
+            out.append(line)
+            continue
+        pos = 0
+        for match in URL_LINE_RE.finditer(line):
+            before = line[pos:match.start()].strip()
+            url = match.group(0)
+            trimmed = url.rstrip(".,;:!?)]}>\"'`”’*_")
+            if before:
+                out.append(before.rstrip(" :–—-") + (":" if before.rstrip().endswith(":") else ""))
+            out.extend(["", trimmed, ""])
+            pos = match.start() + len(trimmed)
+        after = line[pos:].strip().lstrip(".,;:!?)]}>\"'`”’*_ ").strip()
+        if after:
+            out.append(after)
+    return normalize_whitespace("\n".join(out))
+
+
+def drop_wa_links(text):
+    cleaned = re.sub(rf"https://wa\.me/{EDICLEIA_WA}\S*", " ", str(text or ""), flags=re.IGNORECASE)
     return normalize_whitespace(cleaned)
 
 
@@ -308,11 +357,18 @@ def sanitize(text, max_bytes=950):
     outside = without_official_urls(value).lower()
     if "prop-" in outside or "código" in outside or "codigo" in outside:
         return ""
+    value = isolate_urls(value)
+    full_lines = set(value.splitlines())
     raw = value.encode("utf-8")
     if len(raw) > max_bytes:
         partial = raw[:max_bytes].decode("utf-8", "ignore")
         parts = re.split(r"\s+(?=\S*$)", partial)
         value = (parts[0] if len(parts) > 1 else partial).strip()
+        # Nunca deixar um link cortado pela metade no fim da mensagem.
+        lines = value.splitlines()
+        if lines and URL_LINE_RE.match(lines[-1]) and lines[-1] not in full_lines:
+            lines.pop()
+        value = normalize_whitespace("\n".join(lines))
     return value
 
 
@@ -601,7 +657,11 @@ def build_wa_link(summary):
         return f"https://wa.me/{EDICLEIA_WA}"
     if len(clean) > 280:
         clean = clean[:280].rsplit(" ", 1)[0].strip()
-    return f"https://wa.me/{EDICLEIA_WA}?text={urllib.parse.quote(clean, safe='')}"
+    # Ponto, hífen, sublinhado e til ficam codificados: assim a URL nunca termina em
+    # pontuação, que o Instagram corta do link.
+    encoded = urllib.parse.quote(clean, safe="")
+    encoded = encoded.replace(".", "%2E").replace("-", "%2D").replace("_", "%5F").replace("~", "%7E")
+    return f"https://wa.me/{EDICLEIA_WA}?text={encoded}"
 
 
 def extract_wa_link(text):
@@ -840,7 +900,9 @@ def build_system_prompt(turns, properties, photos_sent=False):
         "        • Aceita financiamento\n"
         "        • Aceita apartamento como parte do pagamento (até 50% do valor)\n"
         "        • Imóvel averbado, documentação ok\n"
-        "     d) Link do site para mais informações: https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995\n"
+        "     d) Link do site para mais informações, com a URL completa SOZINHA numa linha própria (linha em branco antes e depois, sem Markdown, sem pontuação colada no fim):\n"
+        "        Mais fotos e detalhes no site:\n\n"
+        "        https://ebvimoveiscuritiba.com.br/imovel/prop-1792252762995\n\n"
         "     e) Pergunta final: 'Você gostaria de agendar uma visita para conhecer o Triplex?'\n"
         "   - NÃO repita a saudação automática da Meta ('Olá! Que bom ver seu interesse...').\n"
         "2) TURNOS SEGUINTES / DÚVIDAS ESPECÍFICAS:\n"
@@ -938,6 +1000,8 @@ def luna_reply(turns, properties, photos_sent=False):
         wa_link = ""
     budget = 950 - (len(wa_link.encode("utf-8")) + 2 if wa_link else 0)
     body = sanitize(text, max_bytes=max(350, budget))
+    if has_phone:
+        body = drop_wa_links(body)
     if not body:
         return "", photos, None, ""
     if wa_link:
