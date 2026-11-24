@@ -50,7 +50,11 @@ export async function afterLeadSaved(env, ctx, { contactId, leadId, ref, isNew, 
     vender: "Quer vender o imóvel (WhatsApp pelo site)",
     avaliar: "Quer avaliar o imóvel (WhatsApp pelo site)",
   };
-  const what = input.propertyTitle ? `Interesse em: ${input.propertyTitle}`
+  const sim = extra.simulation;
+  const simSummary = sim ? formatSimulationSummary(sim) : null;
+  const what = simSummary
+    ? `${input.propertyTitle ? `Simulação para ${input.propertyTitle}` : "Simulação de financiamento"} (${simSummary})`
+    : input.propertyTitle ? `Interesse em: ${input.propertyTitle}`
     : input.kind === "avaliacao" ? "Pediu avaliação de imóvel"
     : byInterest[extra.interest] || "Chamou no WhatsApp pelo site";
   await addActivity(env, {
@@ -64,6 +68,7 @@ export async function afterLeadSaved(env, ctx, { contactId, leadId, ref, isNew, 
       interest: extra.interest || null,
       cta: extra.cta || null,
       propertyId: input.propertyId || null,
+      simulation: sim || null,
       viewed: Array.isArray(input.viewed) ? input.viewed.slice(0, 20) : [],
     },
   });
@@ -94,6 +99,21 @@ export async function afterLeadSaved(env, ctx, { contactId, leadId, ref, isNew, 
       `Código: ${ref}`,
     ],
   }));
+}
+
+function formatSimulationSummary(sim) {
+  if (!sim || typeof sim !== "object") return "";
+  const brl = v => Number.isFinite(Number(v)) ? `R$ ${Math.round(Number(v)).toLocaleString("pt-BR")}` : null;
+  const parts = [];
+  if (sim.propertyValue) parts.push(`imóvel ${brl(sim.propertyValue)}`);
+  if (sim.entry) parts.push(`entrada ${brl(sim.entry)}`);
+  if (sim.usesFgts && sim.fgts) parts.push(`FGTS ${brl(sim.fgts)}`);
+  if (sim.hasExchange && sim.exchange) parts.push(`troca ${brl(sim.exchange)}`);
+  if (sim.financed) parts.push(`financiado ${brl(sim.financed)}`);
+  if (sim.termYears) parts.push(`${sim.termYears} anos`);
+  if (sim.sacFirst) parts.push(`SAC 1ª ${brl(sim.sacFirst)}`);
+  if (sim.priceFirst) parts.push(`Price ${brl(sim.priceFirst)}`);
+  return parts.join(" · ");
 }
 
 export async function afterStageChange(env, { leadId, contactId, from, to, lostReason }) {
@@ -149,6 +169,11 @@ export async function afterPropertiesSaved(env, ctx, previousIds, properties) {
 export async function handleCrmAdmin(request, env, ctx, path, method, readBody, helpers) {
   await ensureSchema(env);
   const url = new URL(request.url);
+
+  if (path === "/api/agent/site-metrics" && method === "GET") {
+    if (typeof helpers.getSiteMetrics !== "function") return notFound();
+    return ok(await helpers.getSiteMetrics(env, url.searchParams.get("days")));
+  }
 
   if (path === "/api/admin/crm/overview" && method === "GET") {
     return ok(await overview(env));

@@ -40,8 +40,8 @@ crons = ["*/2 * * * *"]
 [assets]
 directory = "."
 binding = "ASSETS"
-run_worker_first = ["/api/*", "/media/*", "/imovel/*", "/catalog.csv", "/sitemap.xml", "/robots.txt"]
-not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/media/*", "/imovel/*", "/simulador", "/simulador/", "/artigos", "/artigos/*", "/catalog.csv", "/sitemap.xml", "/robots.txt"]
+not_found_handling = "404-page"
 
 [[d1_databases]]
 binding = "DB"
@@ -52,3 +52,19 @@ migrations_dir = "migrations"
 [[r2_buckets]]
 binding = "PHOTOS"
 bucket_name = "ebv-imoveis-photos"
+
+[env.preview]
+name = "site-ebv-preview"
+workers_dev = true
+preview_urls = true
+
+[env.preview.vars]
+ADMIN_USERNAME = "contato@ebvimoveiscuritiba.com.br"
+META_PIXEL_ID = "1430221655110940"
+PREVIEW_MODE = "true"
+
+[env.preview.assets]
+directory = "."
+binding = "ASSETS"
+run_worker_first = ["/api/*", "/media/*", "/imovel/*", "/simulador", "/simulador/", "/artigos", "/artigos/*", "/catalog.csv", "/sitemap.xml", "/robots.txt"]
+not_found_handling = "404-page"

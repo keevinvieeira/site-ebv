@@ -169,6 +169,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   populateSearchFilters();
   updateAdminDashboard();
   renderAdminPhotoGallery();
+  if (window.EBVFinancing) window.EBVFinancing.refreshProperties();
   if (!initialHandled) {
     handleLocationRoute();
   }
@@ -567,6 +568,7 @@ function checkLgpdConsent() {
 
 function acceptLgpdConsent() {
   localStorage.setItem("ebv_lgpd_consent", "true");
+  if (window.EBVTracking && window.EBVTracking.grantConsent) window.EBVTracking.grantConsent();
   const banner = document.getElementById("lgpd-banner");
   if (banner) banner.classList.remove("is-visible");
 }
@@ -985,8 +987,12 @@ function handleLocationRoute() {
   }
 
   hidePropertyDetails();
+  if (window.__EBV_SIMULATOR_PAGE__) {
+    navigateTo("simulador");
+    return;
+  }
   const pageId = window.location.hash.slice(1);
-  if (["home", "imoveis", "avaliacao", "sobre", "termos", "privacidade"].includes(pageId)) {
+  if (["home", "imoveis", "simulador", "avaliacao", "sobre", "termos", "privacidade"].includes(pageId)) {
     navigateTo(pageId);
   }
 }
@@ -1064,6 +1070,7 @@ function openPropertyModal(id, standalone = false) {
   const phone = "5541988024346";
   const textMessage = encodeURIComponent(`Olá Edicleia! Tenho interesse no imóvel "${prop.title}" (${formatBRL(prop.price)}) que vi no seu site EBV Imóveis. Gostaria de receber mais informações.`);
   document.getElementById("modal-whatsapp-link").href = `https://wa.me/${phone}?text=${textMessage}`;
+  if (window.EBVFinancing) window.EBVFinancing.openForProperty(prop);
 
   // Open Modal
   const modal = document.getElementById("property-modal");
@@ -1261,7 +1268,11 @@ async function submitAppraisal(event) {
   }
 
   if (window.EBVTracking) {
-    window.EBVTracking.track("Lead", { lead_type: "proprietario", content_name: `${type} - ${location}`, currency: "BRL" }, eventId);
+    if (window.EBVTracking.generateLead) {
+      window.EBVTracking.generateLead({ lead_type: "proprietario", content_name: `${type} - ${location}`, currency: "BRL" }, eventId);
+    } else {
+      window.EBVTracking.track("Lead", { lead_type: "proprietario", content_name: `${type} - ${location}`, currency: "BRL" }, eventId);
+    }
   }
 
   const successAlert = document.getElementById("appraisal-success");
@@ -1284,6 +1295,7 @@ function switchAdminTab(tabName, btnElement) {
   containers.forEach(c => c.classList.remove("active"));
 
   document.getElementById(`admin-tab-${tabName}`).classList.add("active");
+  if (tabName === "financing" && window.EBVFinancing) window.EBVFinancing.openAdmin();
 }
 
 // Compress and resize uploaded image file via HTML5 Canvas (Max 1200px width/height, 75% JPEG quality)

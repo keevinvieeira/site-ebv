@@ -55,7 +55,7 @@
   <meta name="twitter:image" content="https://ebvimoveiscuritiba.com.br/assets/og-image.jpg">
 
   <!-- Security & CSP -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://connect.facebook.net; connect-src 'self' https://www.facebook.com https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-src 'self' https://maps.google.com https://www.google.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://connect.facebook.net https://www.googletagmanager.com; connect-src 'self' https://www.facebook.com https://connect.facebook.net https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-src 'self' https://maps.google.com https://www.google.com https://www.googletagmanager.com;">
 
   <!-- Schema.org JSON-LD Structured Data (RealEstateAgent / LocalBusiness) -->
   <script type="application/ld+json">
@@ -186,6 +186,8 @@
         <ul id="nav-menu">
           <li><a href="#home" class="nav-link active" onclick="navigateTo('home')">Início</a></li>
           <li><a href="#imoveis" class="nav-link" onclick="navigateTo('imoveis')">Imóveis</a></li>
+          <li><a href="/simulador" class="nav-link">Simulador</a></li>
+          <li><a href="/artigos/" class="nav-link">Artigos</a></li>
           <li><a href="#avaliacao" class="nav-link" onclick="navigateTo('avaliacao')">Avaliação</a></li>
           <li><a href="#sobre" class="nav-link" onclick="navigateTo('sobre')">Sobre a Corretora</a></li>
           <li><a href="#admin" class="nav-btn-admin" onclick="navigateTo('admin')">Painel EBV</a></li>
@@ -348,6 +350,18 @@
             <p>Edicleia Borba Vieira, corretora de imóveis e avaliadora imobiliária, CRECI-PR 14269, com mais de 25 anos de experiência no mercado de Curitiba.</p>
           </details>
         </div>
+      </section>
+    </div>
+
+    <!-- PAGE: SIMULADOR -->
+    <div id="page-simulador" class="page">
+      <section class="finance-page-section">
+        <nav class="finance-breadcrumb" aria-label="Navegação estrutural"><a href="/">Início</a><span>›</span><span>Simulador</span></nav>
+        <div id="financing-page-root"></div>
+        <aside class="finance-learning-card">
+          <div><span class="section-tagline">Entenda antes de escolher</span><h2>SAC ou Price?</h2><p>Veja como a amortização muda a primeira parcela, o custo total e a queda do saldo devedor.</p></div>
+          <a class="btn-secondary" href="/artigos/sac-ou-price/">Ler o guia completo</a>
+        </aside>
       </section>
     </div>
 
@@ -629,6 +643,7 @@
             <button class="admin-tab-btn active" onclick="switchAdminTab('props', this)">Meus Imóveis</button>
             <button class="admin-tab-btn" onclick="switchAdminTab('requests', this)">Avaliações Solicitadas (<span id="req-count">0</span>)</button>
             <button class="admin-tab-btn" onclick="switchAdminTab('leads', this)">CRM (<span id="crm-today-count">0</span> hoje)</button>
+            <button class="admin-tab-btn" onclick="switchAdminTab('financing', this)">Financiamento</button>
             <button class="btn-secondary" onclick="handleLogout()" style="padding: 6px 15px; font-size: 0.8rem; border-radius: 20px; border-color: #c0392b; color: #c0392b; background: transparent; height: 35px; box-shadow: none;">Sair</button>
           </div>
         </div>
@@ -821,6 +836,31 @@
           </section>
         </div>
 
+        <div id="admin-tab-financing" class="admin-container">
+          <div class="financing-admin-stats">
+            <div class="stat-card"><h4>Simulações</h4><p id="financing-stat-simulations">0</p></div>
+            <div class="stat-card"><h4>Contatos</h4><p id="financing-stat-contacts">0</p></div>
+            <div class="stat-card"><h4>Conversão</h4><p id="financing-stat-conversion">0%</p></div>
+          </div>
+          <form id="financing-settings-form" class="form-card financing-settings-form">
+            <div><span class="section-tagline">Referência do simulador</span><h3>Taxas e limites editáveis</h3><p>Revise a fonte oficial e a data sempre que alterar uma taxa.</p></div>
+            <div class="form-grid">
+              <label class="form-group"><span>Taxa efetiva anual (%)</span><input name="annualRateEffective" type="number" min="0.01" max="50" step="0.01" required></label>
+              <label class="form-group"><span>Comprometimento de renda (%)</span><input name="incomeCommitmentPercent" type="number" min="1" max="100" step="0.1" required></label>
+              <label class="form-group"><span>Entrada mínima SAC (%)</span><input name="minimumEntrySacPercent" type="number" min="0" max="90" step="0.1" required></label>
+              <label class="form-group"><span>Entrada mínima Price (%)</span><input name="minimumEntryPricePercent" type="number" min="0" max="90" step="0.1" required></label>
+              <label class="form-group"><span>Prazo mínimo (anos)</span><input name="minimumTermYears" type="number" min="1" max="50" required></label>
+              <label class="form-group"><span>Prazo máximo (anos)</span><input name="maximumTermYears" type="number" min="1" max="50" required></label>
+              <label class="form-group form-full"><span>Nome da fonte oficial</span><input name="sourceLabel" maxlength="200" required></label>
+              <label class="form-group form-full"><span>Link da fonte oficial</span><input name="sourceUrl" type="url" maxlength="1000" required></label>
+              <label class="form-group"><span>Data da fonte</span><input name="sourcePublishedAt" type="date" required></label>
+              <label class="form-group"><span>Data da conferência</span><input name="sourceCheckedAt" type="date" required></label>
+            </div>
+            <button class="btn-primary" type="submit">Salvar referência</button>
+            <p class="finance-form-status" data-settings-status aria-live="polite"></p>
+          </form>
+        </div>
+
         <!-- Ficha do contato (CRM) -->
         <div id="crm-drawer" class="crm-drawer" hidden>
           <div class="crm-drawer-backdrop" data-crm-close></div>
@@ -908,6 +948,8 @@
             <span>Endereço: Carregando...</span>
           </p>
         </div>
+
+        <section id="modal-financing-root" class="modal-financing-root" aria-label="Simulador de financiamento"></section>
         
         <!-- Contact Footer -->
         <div class="modal-footer-contact">
@@ -947,6 +989,8 @@
         <ul class="footer-links">
           <li><a href="#home" onclick="navigateTo('home')">Início</a></li>
           <li><a href="#imoveis" onclick="navigateTo('imoveis')">Imóveis</a></li>
+          <li><a href="/simulador">Simulador</a></li>
+          <li><a href="/artigos/">Artigos</a></li>
           <li><a href="#avaliacao" onclick="navigateTo('avaliacao')">Avaliação</a></li>
           <li><a href="#sobre" onclick="navigateTo('sobre')">Sobre a Corretora</a></li>
         </ul>
@@ -1047,6 +1091,7 @@
   <script src="tracking.js?v=20261119_fast"></script>
   <script src="app.js?v=20261123_seo"></script>
   <script src="crm-app.js?v=20261123_mobile"></script>
+  <script type="module" src="financing.js?v=20261124_preview"></script>
 
   <!-- Botão Flutuante de WhatsApp Oficial -->
   <a data-cta="flutuante" href="https://wa.me/5541988024346" class="floating-whatsapp-btn" target="_blank" rel="noopener noreferrer" aria-label="Falar no WhatsApp com Edicleia Borba Vieira">

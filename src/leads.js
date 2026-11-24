@@ -4,6 +4,8 @@
 
 import { ensureSchema, upsertContactRow, canonicalPhone, safeJson } from "./schema.js";
 import { attachLeadToContact, afterLeadSaved, afterStageChange, originLabel } from "./crm.js";
+import { markFinancingSimulationConverted } from "./financing.js";
+import { recordSiteEvent } from "./site-metrics.js";
 
 const encoder = new TextEncoder();
 
@@ -26,8 +28,9 @@ export async function postLead(request, env, ctx, body) {
   const v = validateLeadInput(body);
   if (v.error) return { status: 400, body: { error: { code: "invalid_field", message: v.error } } };
 
+  const trackedOrigin = originLabel(v.value.tracking || {});
   const lead = await saveLead(request, env, ctx, {
-    kind: "whatsapp",
+    kind: v.value.context === "simulador" ? "simulador" : "whatsapp",
     leadType: v.value.leadType,
     name: v.value.name,
     phone: v.value.phone,
@@ -37,8 +40,14 @@ export async function postLead(request, env, ctx, body) {
     value: v.value.value,
     tracking: v.value.tracking,
     viewed: v.value.viewed,
-    extra: { context: v.value.context, interest: v.value.interest, cta: v.value.cta },
+    origin: v.value.context === "simulador"
+      ? (trackedOrigin !== "Direto" ? `${trackedOrigin} · Simulador` : "Simulador")
+      : null,
+    extra: { context: v.value.context, interest: v.value.interest, cta: v.value.cta, simulation: v.value.simulation },
   });
+  if (v.value.simulation && v.value.simulation.id) {
+    await markFinancingSimulationConverted(env, v.value.simulation.id, lead.id);
+  }
   return { status: 201, body: { id: lead.id, ref: lead.ref, eventId: lead.eventId, duplicate: lead.duplicate === true } };
 }
 
@@ -250,7 +259,7 @@ async function saveLead(request, env, ctx, input) {
   const { contactId, openLead } = await attachLeadToContact(env, {
     name: input.name, phone: phoneDigits, email: input.email, leadType: input.leadType, kind: input.kind,
   });
-  const origin = originLabel(input.tracking || {});
+  const origin = input.origin || originLabel(input.tracking || {});
   if (openLead) {
     await env.DB.prepare("UPDATE leads SET updated_at = ? WHERE id = ?").bind(nowIso, openLead.id).run();
     await afterLeadSaved(env, ctx, { contactId, leadId: openLead.id, ref: openLead.ref, isNew: false, input: { ...input, origin } });
@@ -267,6 +276,7 @@ async function saveLead(request, env, ctx, input) {
   const resolvedFbp = input.tracking.fbp || cookieFbp || null;
   const data = {
     eventId,
+    origin,
     tracking: {
       ...input.tracking,
       ...(resolvedFbc ? { fbc: resolvedFbc } : {}),
@@ -301,6 +311,7 @@ async function saveLead(request, env, ctx, input) {
     phone: phoneDigits, email: input.email, property_id: input.propertyId, property_title: input.propertyTitle,
     value: input.value, data,
   };
+  ctx.waitUntil(recordServerLeadMetric(env, input));
   ctx.waitUntil(sendAndLog(env, lead, {
     eventName: "Lead",
     eventId,
@@ -575,14 +586,47 @@ function validateLeadInput(value) {
   const propertyTitle = typeof value.propertyTitle === "string" ? value.propertyTitle.slice(0, 200) : null;
   const num = Number(value.value);
   const leadValue = Number.isFinite(num) && num > 0 && num < 1e10 ? num : null;
+  const simulation = sanitizeSimulation(value.simulation);
 
   return {
     value: {
-      name, phone: digits, leadType, context, interest, cta, propertyId, propertyTitle, value: leadValue,
+      name, phone: digits, leadType, context, interest, cta, propertyId, propertyTitle, value: leadValue, simulation,
       tracking: sanitizeTracking(value.tracking),
       viewed: Array.isArray(value.viewed) ? value.viewed.filter(x => typeof x === "string" && x.length <= 200).slice(0, 20) : [],
     },
   };
+}
+
+function recordServerLeadMetric(env, input) {
+  let path = "/";
+  try {
+    if (input.tracking && input.tracking.pageUrl) path = new URL(input.tracking.pageUrl).pathname || "/";
+  } catch { /* ignore */ }
+  const utm = String((input.tracking && input.tracking.utm_source) || "").toLowerCase();
+  const ref = String((input.tracking && input.tracking.referrer) || "").toLowerCase();
+  const source = utm.includes("instagram") || ref.includes("instagram") ? "instagram"
+    : utm.includes("facebook") || utm.includes("meta") || ref.includes("facebook") ? "facebook"
+    : utm.includes("google") || ref.includes("google") ? "google"
+    : ref ? "other" : "direct";
+  const tasks = [recordSiteEvent(env, { eventName: "generate_lead", path, source, propertyId: input.propertyId || null })];
+  if (input.kind === "simulador") {
+    tasks.push(recordSiteEvent(env, { eventName: "simulator_contact", path, source, propertyId: input.propertyId || null }));
+  }
+  return Promise.all(tasks).catch(() => {});
+}
+
+function sanitizeSimulation(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const id = typeof value.id === "string" && /^[A-Za-z0-9:_-]{1,200}$/.test(value.id) ? value.id : null;
+  const fields = ["propertyValue", "entry", "fgts", "exchange", "financed", "termYears", "annualRateEffective", "sacFirst", "sacLast", "priceFirst", "priceLast", "minimumIncome"];
+  const out = id ? { id } : {};
+  for (const field of fields) {
+    const number = Number(value[field]);
+    if (Number.isFinite(number) && number >= 0 && number < 1e12) out[field] = number;
+  }
+  if (typeof value.usesFgts === "boolean") out.usesFgts = value.usesFgts;
+  if (typeof value.hasExchange === "boolean") out.hasExchange = value.hasExchange;
+  return Object.keys(out).length ? out : null;
 }
 
 function sanitizeTracking(t) {
