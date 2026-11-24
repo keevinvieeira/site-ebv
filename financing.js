@@ -1,4 +1,5 @@
 const CURRENCY = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
+const CURRENCY_INT = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const NUMBER = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
 const calculatorStates = new Map();
 let settingsPromise = null;
@@ -104,10 +105,36 @@ async function renderCalculator(root, property = null, standalone = false) {
   if (standalone && window.location.hash === "#contato") openContactForm(state);
 }
 
+export function shortPropertyLabel(item) {
+  if (!item || typeof item !== "object") return "Simulação sem imóvel selecionado";
+  if (item.shortTitle) return String(item.shortTitle);
+  const title = String(item.title || "");
+  const typeRaw = String(item.type || "imóvel").toLowerCase();
+  const typeLabel = /triplex/i.test(title) ? "Triplex"
+    : /studio/i.test(title) ? "Studio"
+    : typeRaw.charAt(0).toUpperCase() + typeRaw.slice(1);
+  const beds = Number(item.beds) || 0;
+  const area = Number(item.area) || 0;
+  let spec = "";
+  if (typeLabel === "Triplex" || typeLabel === "Terreno") {
+    spec = area > 0 ? `${area} m²` : (beds > 0 ? `${beds} ${beds === 1 ? "quarto" : "quartos"}` : "");
+  } else if (typeLabel === "Studio") {
+    spec = beds > 0 ? `${beds} dorm.` : (area > 0 ? `${area} m²` : "");
+  } else {
+    spec = beds > 0 ? `${beds} ${beds === 1 ? "quarto" : "quartos"}` : (area > 0 ? `${area} m²` : "");
+  }
+  const head = spec ? `${typeLabel} ${spec}` : typeLabel;
+  const parts = [head];
+  if (item.location) parts.push(String(item.location).trim());
+  const price = Number(item.price) || 0;
+  if (price > 0) parts.push(CURRENCY_INT.format(price));
+  return parts.join(" · ");
+}
+
 function propertyOptionsHtml(selected) {
   const list = properties();
   if (!list.length) return '<option value="">Simulação sem imóvel selecionado</option>';
-  return list.map(item => `<option value="${escapeHtml(item.id)}" ${selected && item.id === selected.id ? "selected" : ""}>${escapeHtml(item.title)} · ${CURRENCY.format(Number(item.price) || 0)}</option>`).join("");
+  return list.map(item => `<option value="${escapeHtml(item.id)}" ${selected && item.id === selected.id ? "selected" : ""}>${escapeHtml(shortPropertyLabel(item))}</option>`).join("");
 }
 
 function calculatorMarkup(uid, settings, property, propertyValue, minimumEntry, standalone) {

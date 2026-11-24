@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildSacSeries, calculateFinancing } from "../financing.js";
+import { buildSacSeries, calculateFinancing, shortPropertyLabel } from "../financing.js";
 import { normalizeSettings } from "./financing.js";
 
 test("calcula SAC e Price com primeira e última parcela", () => {
@@ -49,5 +49,16 @@ test("normaliza configuração sem perder a fonte oficial", () => {
   assert.equal(settings.annualRateEffective, 11.25);
   assert.equal(settings.sourceLabel, "CAIXA oficial");
   assert.match(settings.sourceUrl, /^https:\/\//);
+});
+
+test("gera nome curto legível para o seletor do simulador", () => {
+  assert.equal(
+    shortPropertyLabel({ title: "Lindo Triplex 220 m2", type: "sobrado", area: 220, beds: 3, location: "Uberaba", price: 1190000 }),
+    "Triplex 220 m² · Uberaba · R$\u00a01.190.000",
+  );
+  assert.equal(
+    shortPropertyLabel({ title: "Lançamento - Studios com 1 dormitório", type: "apartamento", area: 19, beds: 1, location: "Alto da Rua XV", price: 261000 }),
+    "Studio 1 dorm. · Alto da Rua XV · R$\u00a0261.000",
+  );
 });
 

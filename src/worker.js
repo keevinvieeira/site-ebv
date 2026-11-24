@@ -1001,33 +1001,29 @@ function addSecurityHeaders(response, env) {
 let previewDbSingleton = null;
 function getPreviewDb() {
   if (previewDbSingleton) return previewDbSingleton;
-  const seedProperty = {
-    id: "prop-1792252762995",
-    title: "Lindo Triplex 220 m2 com 3 Quartos/1 Suíte | Uberaba de Cima | Curitiba/PR",
-    type: "Sobrado",
-    location: "Uberaba de Cima",
-    price: 1190000,
-    area: 220,
-    beds: 3,
-    baths: 4,
-    vagas: 2,
-    exchangeMaxPercent: 50,
-    desc: "Triplex averbado no Uberaba de Cima. Aceita financiamento e apartamento até 50% do valor.",
-    image: "/assets/hero_bg.jpg",
-    images: ["/assets/hero_bg.jpg"],
-  };
+  const seedProperties = [
+    { id: "prop-1792252762995", title: "Lindo Triplex 220 m2 com 3 Quartos/1 Suíte | Uberaba de Cima | Curitiba/PR", type: "sobrado", location: "Uberaba", price: 1190000, area: 220, beds: 3, baths: 3, vagas: 3, exchangeMaxPercent: 50, desc: "Triplex averbado no Uberaba de Cima. Aceita financiamento e apartamento até 50% do valor.", image: "/assets/hero_bg.jpg", images: ["/assets/hero_bg.jpg"] },
+    { id: "prop-1786737317774", title: "Lançamento - Studios com 1 dormitório à venda | Alto da Rua XV | Curitiba/PR", type: "apartamento", location: "Alto da Rua XV", price: 261000, area: 19, beds: 1, baths: 1, vagas: 0, desc: "Studios com 1 dormitório no Alto da Rua XV.", image: "/assets/prop_1.webp", images: ["/assets/prop_1.webp"] },
+    { id: "prop-default-1", title: "Maravilhoso Sobrado com 4 Quartos/2 Suítes - Lindíssimo | Jd. das Américas | Curitiba/PR", type: "sobrado", location: "Jardim das Américas", price: 1249900, area: 187, beds: 4, baths: 4, vagas: 2, desc: "Sobrado 4 quartos no Jardim das Américas.", image: "/assets/prop_2.webp", images: ["/assets/prop_2.webp"] },
+    { id: "prop-default-2", title: "Excelente Terreno (ZR3) em Rua Plana | Próx. BR 277 | Cajuru | Curitiba/PR", type: "terreno", location: "Cajuru", price: 690000, area: 491, beds: 0, baths: 0, vagas: 0, desc: "Terreno ZR3 plano no Cajuru.", image: "/assets/terreno_real.webp", images: ["/assets/terreno_real.webp"] },
+    { id: "prop-default-jba-1", title: "Sobrados Novos 3 Quartos/1 Suíte | Residencial Harmonia | Uberaba/Jd. Das Américas | Curitiba/PR", type: "sobrado", location: "Uberaba", price: 847000, area: 123, beds: 3, baths: 3, vagas: 2, desc: "Sobrados novos 3 quartos no Residencial Harmonia.", image: "/assets/prop_3.webp", images: ["/assets/prop_3.webp"] },
+    { id: "prop-default-jba-2", title: "Apartamento 2 Quartos | Edifício Garden Sevilha | Condomínio Clube | Boa Vista | Curitiba/PR", type: "apartamento", location: "Boa Vista", price: 563000, area: 59, beds: 2, baths: 2, vagas: 1, desc: "Apartamento 2 quartos no Boa Vista.", image: "/assets/prop_4.webp", images: ["/assets/prop_4.webp"] },
+  ];
   const makeStmt = (sql) => {
     const stmt = {
       _args: [],
       bind(...args) { stmt._args = args; return stmt; },
       async run() { return { success: true, meta: { changes: 1 } }; },
       async first() {
-        if (/FROM\s+properties/i.test(sql)) return { id: seedProperty.id, data: JSON.stringify(seedProperty) };
+        if (/FROM\s+properties/i.test(sql)) {
+          const found = seedProperties.find(p => p.id === stmt._args[0]) || seedProperties[0];
+          return { id: found.id, data: JSON.stringify(found) };
+        }
         if (/FROM\s+financing_simulations/i.test(sql)) return { simulations: 0, contacts: 0 };
         return null;
       },
       async all() {
-        if (/FROM\s+properties/i.test(sql)) return { results: [{ id: seedProperty.id, data: JSON.stringify(seedProperty) }] };
+        if (/FROM\s+properties/i.test(sql)) return { results: seedProperties.map(p => ({ id: p.id, data: JSON.stringify(p) })) };
         return { results: [] };
       },
     };

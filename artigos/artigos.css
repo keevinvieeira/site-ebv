@@ -11,14 +11,14 @@
 
 main { padding-top: 82px; background: var(--paper); color: var(--ink); font-family: var(--font-body); line-height: 1.72; }
 .container { width: min(100% - 40px, 1060px); margin-inline: auto; }
-.hero { padding: 56px 0 44px; background: linear-gradient(145deg, rgba(114,47,55,.08), rgba(198,167,94,.12)); }
+.articles-hero { padding: 34px 0 28px; background: linear-gradient(145deg, rgba(114,47,55,.07), rgba(198,167,94,.1)); border-bottom: 1px solid var(--line); }
 .eyebrow { color: var(--wine); font-family: var(--font-sub); font-size: .76rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
-.hero h1, .article-body h2, .article-body h3, .aside-card h2, .article-card h2, .cta-box h2 { font-family: var(--font-title); color: var(--wine-dark); line-height: 1.17; }
-.hero h1 { max-width: 850px; margin-top: 12px; font-size: clamp(2.1rem, 5vw, 3.8rem); }
-.hero-summary { max-width: 760px; margin-top: 18px; color: var(--muted); font-size: 1.08rem; }
-.breadcrumb { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; color: var(--muted); font-family: var(--font-sub); font-size: .82rem; }
+.articles-hero h1, .article-body h2, .article-body h3, .aside-card h2, .article-card h2, .cta-box h2 { font-family: var(--font-title); color: var(--wine-dark); line-height: 1.17; }
+.articles-hero h1 { max-width: 850px; margin-top: 10px; font-size: clamp(1.9rem, 4vw, 3rem); }
+.hero-summary { max-width: 760px; margin-top: 12px; color: var(--muted); font-size: 1.04rem; }
+.breadcrumb { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; color: var(--muted); font-family: var(--font-sub); font-size: .82rem; }
 .breadcrumb a { color: var(--wine); text-decoration: none; }
-.articles-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 22px; padding: 52px 0 76px; }
+.articles-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 22px; padding: 32px 0 64px; }
 .article-card { display: flex; flex-direction: column; min-height: 100%; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--white); box-shadow: 0 12px 30px rgba(55,35,38,.05); }
 .article-card-band { height: 8px; background: linear-gradient(90deg, var(--wine), var(--gold)); }
 .article-card-body { display: flex; flex: 1; flex-direction: column; padding: 25px; }
@@ -68,13 +68,9 @@ main { padding-top: 82px; background: var(--paper); color: var(--ink); font-fami
   .article-aside { position: static; }
 }
 @media (max-width: 620px) {
-  .nav { align-items: flex-start; padding: 10px 16px; }
-  .brand span { display: none; }
-  .nav-links { justify-content: flex-end; gap: 10px; }
-  .nav-links a { font-size: .75rem; }
-  .hero { padding: 44px 0 34px; }
+  .articles-hero { padding: 26px 0 22px; }
   .container { width: min(100% - 28px, 1060px); }
-  .article-layout { padding-top: 34px; }
+  .article-layout { padding-top: 28px; }
   .comparison { display: block; overflow-x: auto; }
   .cta-actions, .cta-actions .button { width: 100%; }
 }
