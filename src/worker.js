@@ -22,37 +22,38 @@ const SECURITY_HEADERS = {
 
 export default {
   async fetch(request, env, ctx) {
+    const runtimeEnv = !env.DB && env.PREVIEW_MODE === "true" ? { ...env, DB: getPreviewDb() } : env;
     const url = new URL(request.url);
 
     try {
       let response;
       if (url.pathname.startsWith("/api/")) {
-        response = await handleApi(request, env, url, ctx);
+        response = await handleApi(request, runtimeEnv, url, ctx);
       } else if (url.pathname.startsWith("/media/")) {
-        response = await handleMedia(request, env, url);
+        response = await handleMedia(request, runtimeEnv, url);
       } else if (url.pathname === "/catalog.csv") {
-        response = new Response(await catalogCsv(env, url.origin), {
+        response = new Response(await catalogCsv(runtimeEnv, url.origin), {
           headers: { "Content-Type": "text/csv; charset=utf-8", "Cache-Control": "public, max-age=900" },
         });
       } else if (url.pathname === "/sitemap.xml") {
-        response = new Response(await generateSitemap(env, url.origin), {
+        response = new Response(await generateSitemap(runtimeEnv, url.origin), {
           headers: { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "public, max-age=3600" },
         });
       } else if (url.pathname === "/robots.txt") {
-        response = new Response(generateRobots(url.origin, env), {
+        response = new Response(generateRobots(url.origin, runtimeEnv), {
           headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=86400" },
         });
       } else if (url.pathname.startsWith("/imovel/")) {
-        response = await handlePropertyPage(request, env, url);
+        response = await handlePropertyPage(request, runtimeEnv, url);
       } else if (url.pathname === "/simulador" || url.pathname === "/simulador/") {
-        response = await handleSimulatorPage(request, env, url);
+        response = await handleSimulatorPage(request, runtimeEnv, url);
       } else if (url.pathname === "/artigos" || url.pathname.startsWith("/artigos/")) {
-        response = await handleArticlePage(request, env, url);
+        response = await handleArticlePage(request, runtimeEnv, url);
       } else {
-        response = await env.ASSETS.fetch(request);
+        response = await runtimeEnv.ASSETS.fetch(request);
       }
 
-      return addSecurityHeaders(response, env);
+      return addSecurityHeaders(response, runtimeEnv);
     } catch (error) {
       const requestId = crypto.randomUUID();
       console.error("Unhandled request error", requestId, error);
@@ -988,6 +989,48 @@ function addSecurityHeaders(response, env) {
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) headers.set(name, value);
   if (env && env.PREVIEW_MODE === "true") headers.set("X-Robots-Tag", "noindex, nofollow");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+let previewDbSingleton = null;
+function getPreviewDb() {
+  if (previewDbSingleton) return previewDbSingleton;
+  const seedProperty = {
+    id: "prop-1792252762995",
+    title: "Lindo Triplex 220 m2 com 3 Quartos/1 Suíte | Uberaba de Cima | Curitiba/PR",
+    type: "Sobrado",
+    location: "Uberaba de Cima",
+    price: 1190000,
+    area: 220,
+    beds: 3,
+    baths: 4,
+    vagas: 2,
+    exchangeMaxPercent: 50,
+    desc: "Triplex averbado no Uberaba de Cima. Aceita financiamento e apartamento até 50% do valor.",
+    image: "/assets/hero_bg.jpg",
+    images: ["/assets/hero_bg.jpg"],
+  };
+  const makeStmt = (sql) => {
+    const stmt = {
+      _args: [],
+      bind(...args) { stmt._args = args; return stmt; },
+      async run() { return { success: true, meta: { changes: 1 } }; },
+      async first() {
+        if (/FROM\s+properties/i.test(sql)) return { id: seedProperty.id, data: JSON.stringify(seedProperty) };
+        if (/FROM\s+financing_simulations/i.test(sql)) return { simulations: 0, contacts: 0 };
+        return null;
+      },
+      async all() {
+        if (/FROM\s+properties/i.test(sql)) return { results: [{ id: seedProperty.id, data: JSON.stringify(seedProperty) }] };
+        return { results: [] };
+      },
+    };
+    return stmt;
+  };
+  previewDbSingleton = {
+    prepare(sql) { return makeStmt(sql); },
+    async batch(stmts) { return Promise.all(stmts.map(s => s.run())); },
+  };
+  return previewDbSingleton;
 }
 
 
