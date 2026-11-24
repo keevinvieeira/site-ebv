@@ -60,9 +60,11 @@ export async function getSiteMetrics(env, requestedDays = 30) {
   await ensureSiteMetricsSchema(env);
   const days = Math.min(365, Math.max(1, Number.parseInt(requestedDays, 10) || 30));
   const since = new Date(Date.now() - days * 86400000).toISOString();
-  const [totals, pages, sources, leads] = await Promise.all([
+  const [totals, eventsByDay, pages, sources, leads, leadsByDay] = await Promise.all([
     env.DB.prepare(`SELECT event_name, COUNT(*) AS total
       FROM site_events WHERE created_at >= ? GROUP BY event_name ORDER BY total DESC`).bind(since).all(),
+    env.DB.prepare(`SELECT substr(created_at, 1, 10) AS day, event_name, COUNT(*) AS total
+      FROM site_events WHERE created_at >= ? GROUP BY substr(created_at, 1, 10), event_name ORDER BY day DESC, total DESC`).bind(since).all(),
     env.DB.prepare(`SELECT path, COUNT(*) AS views
       FROM site_events WHERE event_name = 'page_view' AND created_at >= ?
       GROUP BY path ORDER BY views DESC, path ASC LIMIT 20`).bind(since).all(),
@@ -72,13 +74,18 @@ export async function getSiteMetrics(env, requestedDays = 30) {
     env.DB.prepare(`SELECT COALESCE(json_extract(data, '$.origin'), kind, 'Não informada') AS origin, COUNT(*) AS contacts
       FROM leads WHERE created_at >= ? GROUP BY COALESCE(json_extract(data, '$.origin'), kind, 'Não informada')
       ORDER BY contacts DESC, origin ASC`).bind(since).all(),
+    env.DB.prepare(`SELECT substr(created_at, 1, 10) AS day, COALESCE(json_extract(data, '$.origin'), kind, 'Não informada') AS origin, COUNT(*) AS contacts
+      FROM leads WHERE created_at >= ? GROUP BY substr(created_at, 1, 10), COALESCE(json_extract(data, '$.origin'), kind, 'Não informada')
+      ORDER BY day DESC, contacts DESC, origin ASC`).bind(since).all(),
   ]);
   return {
     period: { days, since, until: new Date().toISOString() },
     events: rows(totals),
+    eventsByDay: rows(eventsByDay),
     topPages: rows(pages),
     trafficSources: rows(sources),
     crmContactsByOrigin: rows(leads),
+    crmContactsByOriginAndDay: rows(leadsByDay),
     privacy: "Somente eventos agregáveis, sem nome, telefone, endereço IP ou identificador do navegador.",
   };
 }

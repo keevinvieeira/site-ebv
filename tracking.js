@@ -251,7 +251,6 @@
 
   async function init() {
     captureAttribution();
-    siteMetric("page_view");
     if (typeof window.__EBV_META_PIXEL_ID__ === "string" && window.__EBV_META_PIXEL_ID__) {
       pixelId = window.__EBV_META_PIXEL_ID__;
       if (hasConsent()) grantConsent();
