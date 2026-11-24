@@ -1,5 +1,7 @@
 import { postLead, leadFromAppraisal, listLeads, updateLead, deleteLead, importLeads, audienceCsv, createManualLead, saveDirectLead } from "./leads.js";
 import { handleCrmAdmin, handleAgentApi, handleInstagramWebhook, pollInstagram, afterPropertiesSaved, catalogCsv } from "./crm.js";
+import { createFinancingSimulation, getFinancingMetrics, getFinancingSettings, saveFinancingSettings } from "./financing.js";
+import { getSiteMetrics, recordSiteEvent } from "./site-metrics.js";
 
 const SESSION_COOKIE = "ebv_session";
 const SESSION_TTL_SECONDS = 8 * 60 * 60;
@@ -42,6 +44,10 @@ export default {
         });
       } else if (url.pathname.startsWith("/imovel/")) {
         response = await handlePropertyPage(request, env, url);
+      } else if (url.pathname === "/simulador" || url.pathname === "/simulador/") {
+        response = await handleSimulatorPage(request, env, url);
+      } else if (url.pathname === "/artigos" || url.pathname.startsWith("/artigos/")) {
+        response = await handleArticlePage(request, env, url);
       } else {
         response = await env.ASSETS.fetch(request);
       }
@@ -101,7 +107,56 @@ async function handleApi(request, env, url, ctx) {
 
   if (path === "/api/config") {
     if (method !== "GET") return methodNotAllowed(["GET"]);
-    return jsonResponse({ metaPixelId: env.META_PIXEL_ID || null });
+    return jsonResponse({
+      metaPixelId: env.META_PIXEL_ID || null,
+      gtmId: env.GTM_ID || null,
+      ga4Id: env.GA4_ID || null,
+    });
+  }
+
+  if (path === "/api/financing/config") {
+    if (method !== "GET") return methodNotAllowed(["GET"]);
+    return jsonResponse(await getFinancingSettings(env));
+  }
+
+  if (path === "/api/financing/simulations") {
+    if (method !== "POST") return methodNotAllowed(["POST"]);
+    const parsed = await readJson(request, 32 * 1024);
+    if (parsed.error) return parsed.error;
+    const result = await createFinancingSimulation(env, parsed.value);
+    return result.error
+      ? jsonError(400, "invalid_simulation", result.error)
+      : jsonResponse(result.value, 201);
+  }
+
+  if (path === "/api/metrics/event") {
+    if (method !== "POST") return methodNotAllowed(["POST"]);
+    const parsed = await readJson(request, 8 * 1024);
+    if (parsed.error) return parsed.error;
+    const result = await recordSiteEvent(env, parsed.value);
+    return result.error
+      ? jsonError(400, "invalid_metric", result.error)
+      : jsonResponse({ ok: true }, 202);
+  }
+
+  if (path === "/api/admin/financing/settings") {
+    if (method !== "GET" && method !== "PUT") return methodNotAllowed(["GET", "PUT"]);
+    const unauthorized = await requireAdmin(request, env);
+    if (unauthorized) return unauthorized;
+    if (method === "GET") return jsonResponse(await getFinancingSettings(env));
+    const parsed = await readJson(request, 16 * 1024);
+    if (parsed.error) return parsed.error;
+    const result = await saveFinancingSettings(env, parsed.value);
+    return result.error
+      ? jsonError(400, "invalid_financing_settings", result.error)
+      : jsonResponse(result.value);
+  }
+
+  if (path === "/api/admin/financing/metrics") {
+    if (method !== "GET") return methodNotAllowed(["GET"]);
+    const unauthorized = await requireAdmin(request, env);
+    if (unauthorized) return unauthorized;
+    return jsonResponse(await getFinancingMetrics(env));
   }
 
   if (path === "/api/leads") {
@@ -133,7 +188,7 @@ async function handleApi(request, env, url, ctx) {
   }
 
   if (path.startsWith("/api/agent/")) {
-    return handleAgentApi(request, env, ctx, path, method, () => readJson(request, 64 * 1024), { createManualLead, updateLead, saveDirectLead });
+    return handleAgentApi(request, env, ctx, path, method, () => readJson(request, 64 * 1024), { createManualLead, updateLead, saveDirectLead, getSiteMetrics });
   }
 
   if (path === "/api/admin/leads/import") {
@@ -337,6 +392,50 @@ async function handlePropertyPage(request, env, url) {
   headers.set("Cache-Control", "public, max-age=300");
   headers.set("Content-Type", "text/html; charset=utf-8");
   return new Response(request.method === "HEAD" ? null : html, { status: 200, headers });
+}
+
+async function handleSimulatorPage(request, env, url) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Método não permitido.", { status: 405, headers: { Allow: "GET, HEAD" } });
+  }
+  const assetUrl = new URL("/", url.origin);
+  const assetResponse = await env.ASSETS.fetch(new Request(assetUrl, request));
+  if (!assetResponse.ok) return assetResponse;
+  let html = await assetResponse.text();
+  const canonical = `${url.origin}/simulador`;
+  html = html
+    .replace(/<title>[\s\S]*?<\/title>/i, "<title>Simulador de Financiamento Imobiliário | EBV Imóveis Curitiba</title>")
+    .replace(/<meta name="description" content="[^"]*">/i, '<meta name="description" content="Compare estimativas SAC e Price, entrada, FGTS, imóvel na troca, prazo e renda antes de falar com a corretora EBV em Curitiba.">')
+    .replace("</head>", `<link rel="canonical" href="${canonical}">\n<meta property="og:title" content="Simulador de Financiamento Imobiliário | EBV Imóveis Curitiba">\n<meta property="og:description" content="Compare SAC e Price e leve sua simulação para a corretora.">\n<meta property="og:url" content="${canonical}">\n<script>window.__EBV_SIMULATOR_PAGE__=true;</script>\n</head>`);
+  return new Response(request.method === "HEAD" ? null : html, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" },
+  });
+}
+
+async function handleArticlePage(request, env, url) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Método não permitido.", { status: 405, headers: { Allow: "GET, HEAD" } });
+  }
+  const routes = {
+    "/artigos": "/articles/index.html",
+    "/artigos/": "/articles/index.html",
+    "/artigos/parte-juridica-compra-imovel": "/articles/parte-juridica-compra-imovel/index.html",
+    "/artigos/parte-juridica-compra-imovel/": "/articles/parte-juridica-compra-imovel/index.html",
+    "/artigos/financiamento-imovel-passo-a-passo": "/articles/financiamento-imovel-passo-a-passo/index.html",
+    "/artigos/financiamento-imovel-passo-a-passo/": "/articles/financiamento-imovel-passo-a-passo/index.html",
+    "/artigos/sac-ou-price": "/articles/sac-ou-price/index.html",
+    "/artigos/sac-ou-price/": "/articles/sac-ou-price/index.html",
+  };
+  const assetPath = routes[url.pathname];
+  if (!assetPath) return new Response("Artigo não encontrado.", { status: 404 });
+  const assetUrl = new URL(assetPath, url.origin);
+  const response = await env.ASSETS.fetch(new Request(assetUrl, request));
+  if (!response.ok) return response;
+  const headers = new Headers(response.headers);
+  headers.set("Cache-Control", "public, max-age=300");
+  headers.set("Content-Type", "text/html; charset=utf-8");
+  return new Response(request.method === "HEAD" ? null : response.body, { status: 200, headers });
 }
 
 const PRICE_FORMAT = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -921,34 +1020,34 @@ async function generateSitemap(env, origin) {
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>${origin}/#imoveis</loc>
+    <loc>${origin}/simulador</loc>
     <lastmod>${today}</lastmod>
-    <changefreq>daily</changefreq>
+    <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>${origin}/#avaliacao</loc>
+    <loc>${origin}/artigos/</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${origin}/artigos/parte-juridica-compra-imovel/</loc>
     <lastmod>${today}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>${origin}/#sobre</loc>
+    <loc>${origin}/artigos/financiamento-imovel-passo-a-passo/</loc>
     <lastmod>${today}</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.8</priority>
   </url>
   <url>
-    <loc>${origin}/#privacidade</loc>
+    <loc>${origin}/artigos/sac-ou-price/</loc>
     <lastmod>${today}</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
-  </url>
-  <url>
-    <loc>${origin}/#termos</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
   </url>
   <!-- Imoveis Ativos (SSR) -->
 ${propertyUrls}</urlset>`;
@@ -956,6 +1055,48 @@ ${propertyUrls}</urlset>`;
 
 function generateRobots(origin) {
   return `User-agent: *
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: Meta-ExternalAgent
 Allow: /
 
 # Diretorios restritos e internos
