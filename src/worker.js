@@ -423,14 +423,14 @@ async function handleArticlePage(request, env, url) {
     return new Response("Método não permitido.", { status: 405, headers: { Allow: "GET, HEAD" } });
   }
   const routes = {
-    "/artigos": "/artigos/index.html",
-    "/artigos/": "/artigos/index.html",
-    "/artigos/parte-juridica-compra-imovel": "/artigos/parte-juridica-compra-imovel/index.html",
-    "/artigos/parte-juridica-compra-imovel/": "/artigos/parte-juridica-compra-imovel/index.html",
-    "/artigos/financiamento-imovel-passo-a-passo": "/artigos/financiamento-imovel-passo-a-passo/index.html",
-    "/artigos/financiamento-imovel-passo-a-passo/": "/artigos/financiamento-imovel-passo-a-passo/index.html",
-    "/artigos/sac-ou-price": "/artigos/sac-ou-price/index.html",
-    "/artigos/sac-ou-price/": "/artigos/sac-ou-price/index.html",
+    "/artigos": "/artigos/",
+    "/artigos/": "/artigos/",
+    "/artigos/parte-juridica-compra-imovel": "/artigos/parte-juridica-compra-imovel/",
+    "/artigos/parte-juridica-compra-imovel/": "/artigos/parte-juridica-compra-imovel/",
+    "/artigos/financiamento-imovel-passo-a-passo": "/artigos/financiamento-imovel-passo-a-passo/",
+    "/artigos/financiamento-imovel-passo-a-passo/": "/artigos/financiamento-imovel-passo-a-passo/",
+    "/artigos/sac-ou-price": "/artigos/sac-ou-price/",
+    "/artigos/sac-ou-price/": "/artigos/sac-ou-price/",
   };
   const assetPath = routes[url.pathname];
   if (!assetPath) return new Response("Artigo não encontrado.", { status: 404 });
