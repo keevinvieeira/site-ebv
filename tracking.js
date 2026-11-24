@@ -356,7 +356,7 @@
     if (prop) {
       const article = typeOf(prop) === "casa" || typeOf(prop) === "sala comercial" ? "na" : "no";
       const price = brl(prop.price) ? `, de ${brl(prop.price)},` : "";
-      return `${hello} Tenho interesse ${article} ${describeProperty(prop)}${price} que vi no site da EBV Imóveis:\n${propertyUrl(prop)}\n\nPode me passar mais informações?`;
+      return `${hello} Tenho interesse ${article} ${describeProperty(prop)}${price} que vi no site da EBV Imóveis. Pode me passar mais informações?`;
     }
     return `${hello} Estou procurando um imóvel para comprar em Curitiba e vi o site da EBV Imóveis. Pode me ajudar?`;
   }
