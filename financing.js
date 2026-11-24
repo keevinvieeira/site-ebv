@@ -74,7 +74,8 @@ async function loadSettings() {
 }
 
 function properties() {
-  return typeof window !== "undefined" && typeof window.ebvProperties === "function" ? window.ebvProperties() : [];
+  const list = typeof window !== "undefined" && typeof window.ebvProperties === "function" ? window.ebvProperties() : [];
+  return [...list].sort((a, b) => (b.id === "prop-1792252762995") - (a.id === "prop-1792252762995"));
 }
 
 function triplex() {
@@ -103,8 +104,14 @@ async function renderCalculator(root, property = null, standalone = false) {
   if (standalone && window.location.hash === "#contato") openContactForm(state);
 }
 
+function propertyOptionsHtml(selected) {
+  const list = properties();
+  if (!list.length) return '<option value="">Simulação sem imóvel selecionado</option>';
+  return list.map(item => `<option value="${escapeHtml(item.id)}" ${selected && item.id === selected.id ? "selected" : ""}>${escapeHtml(item.title)} · ${CURRENCY.format(Number(item.price) || 0)}</option>`).join("");
+}
+
 function calculatorMarkup(uid, settings, property, propertyValue, minimumEntry, standalone) {
-  const options = properties().map(item => `<option value="${escapeHtml(item.id)}" ${property && item.id === property.id ? "selected" : ""}>${escapeHtml(item.title)} · ${CURRENCY.format(Number(item.price) || 0)}</option>`).join("");
+  const options = propertyOptionsHtml(property);
   const sourceDate = formatDate(settings.sourceCheckedAt);
   return `
     <div class="finance-card" data-finance-uid="${escapeHtml(uid)}">
@@ -414,7 +421,20 @@ async function saveAdminSettings(event) {
 
 function refreshProperties() {
   const page = document.getElementById("financing-page-root");
-  if (page && !calculatorStates.has(page)) renderCalculator(page, triplex(), true);
+  if (!page) return;
+  if (!calculatorStates.has(page)) {
+    renderCalculator(page, triplex() || properties()[0] || null, true);
+    return;
+  }
+  const state = calculatorStates.get(page);
+  const select = page.querySelector('[data-field="propertyId"]');
+  const list = properties();
+  if (!select || !list.length) return;
+  const current = list.find(item => state.property && item.id === state.property.id) || triplex() || list[0];
+  select.innerHTML = propertyOptionsHtml(current);
+  if (!state.property || state.property.id !== current.id) {
+    selectProperty(state, current.id);
+  }
 }
 
 function openForProperty(property) {

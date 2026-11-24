@@ -49,6 +49,10 @@ export default {
         response = await handleSimulatorPage(request, runtimeEnv, url);
       } else if (url.pathname === "/artigos" || url.pathname.startsWith("/artigos/")) {
         response = await handleArticlePage(request, runtimeEnv, url);
+      } else if (url.pathname === "/articles" || url.pathname.startsWith("/articles/")) {
+        const mapped = url.pathname.replace(/^\/articles(?=\/|$)/, "/artigos");
+        const target = mapped === "/artigos" ? "/artigos/" : mapped;
+        response = Response.redirect(`${url.origin}${target}${url.search}`, 301);
       } else {
         response = await runtimeEnv.ASSETS.fetch(request);
       }
@@ -419,14 +423,14 @@ async function handleArticlePage(request, env, url) {
     return new Response("Método não permitido.", { status: 405, headers: { Allow: "GET, HEAD" } });
   }
   const routes = {
-    "/artigos": "/articles/index.html",
-    "/artigos/": "/articles/index.html",
-    "/artigos/parte-juridica-compra-imovel": "/articles/parte-juridica-compra-imovel/index.html",
-    "/artigos/parte-juridica-compra-imovel/": "/articles/parte-juridica-compra-imovel/index.html",
-    "/artigos/financiamento-imovel-passo-a-passo": "/articles/financiamento-imovel-passo-a-passo/index.html",
-    "/artigos/financiamento-imovel-passo-a-passo/": "/articles/financiamento-imovel-passo-a-passo/index.html",
-    "/artigos/sac-ou-price": "/articles/sac-ou-price/index.html",
-    "/artigos/sac-ou-price/": "/articles/sac-ou-price/index.html",
+    "/artigos": "/artigos/index.html",
+    "/artigos/": "/artigos/index.html",
+    "/artigos/parte-juridica-compra-imovel": "/artigos/parte-juridica-compra-imovel/index.html",
+    "/artigos/parte-juridica-compra-imovel/": "/artigos/parte-juridica-compra-imovel/index.html",
+    "/artigos/financiamento-imovel-passo-a-passo": "/artigos/financiamento-imovel-passo-a-passo/index.html",
+    "/artigos/financiamento-imovel-passo-a-passo/": "/artigos/financiamento-imovel-passo-a-passo/index.html",
+    "/artigos/sac-ou-price": "/artigos/sac-ou-price/index.html",
+    "/artigos/sac-ou-price/": "/artigos/sac-ou-price/index.html",
   };
   const assetPath = routes[url.pathname];
   if (!assetPath) return new Response("Artigo não encontrado.", { status: 404 });

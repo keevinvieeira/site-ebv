@@ -5,10 +5,38 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Página não encontrada | EBV Imóveis Curitiba</title>
   <meta name="robots" content="noindex, follow">
-  <link rel="stylesheet" href="/articles/articles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Montserrat:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap">
+  <link rel="stylesheet" href="/styles.css?v=20261124_pt">
+  <link rel="stylesheet" href="/artigos/artigos.css?v=20261124_pt">
 </head>
 <body>
-  <header class="site-header"><nav class="nav"><a class="brand" href="/"><img src="/assets/logo_icon.webp" alt="Símbolo da EBV Imóveis"><span><strong>EBV Imóveis</strong><span>Curitiba</span></span></a><div class="nav-links"><a href="/artigos/">Artigos</a><a href="/#imoveis">Imóveis</a><a class="nav-cta" href="/simulador">Simulador</a></div></nav></header>
+  <header id="header">
+    <div class="navbar">
+      <a class="brand" href="/#home" style="text-decoration:none">
+        <img src="/assets/logo_icon.webp" alt="EBV Imóveis" class="brand-logo-img" width="50" height="50">
+        <div class="brand-text">
+          <span class="brand-title">EBV Imóveis</span>
+          <span class="brand-subtitle">Curitiba</span>
+        </div>
+      </a>
+      <button class="mobile-toggle" aria-label="Toggle Menu" onclick="document.getElementById('nav-menu').classList.toggle('show')">
+        <span></span><span></span><span></span>
+      </button>
+      <nav>
+        <ul id="nav-menu">
+          <li><a href="/#home" class="nav-link">Início</a></li>
+          <li><a href="/#imoveis" class="nav-link">Imóveis</a></li>
+          <li><a href="/simulador" class="nav-link">Simulador</a></li>
+          <li><a href="/artigos/" class="nav-link">Artigos</a></li>
+          <li><a href="/#avaliacao" class="nav-link">Avaliação</a></li>
+          <li><a href="/#sobre" class="nav-link">Sobre a Corretora</a></li>
+          <li><a href="/#admin" class="nav-btn-admin">Painel EBV</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
   <main>
     <section class="hero">
       <div class="container">
