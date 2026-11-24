@@ -39,7 +39,7 @@ export default {
           headers: { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "public, max-age=3600" },
         });
       } else if (url.pathname === "/robots.txt") {
-        response = new Response(generateRobots(url.origin), {
+        response = new Response(generateRobots(url.origin, env), {
           headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=86400" },
         });
       } else if (url.pathname.startsWith("/imovel/")) {
@@ -52,7 +52,7 @@ export default {
         response = await env.ASSETS.fetch(request);
       }
 
-      return addSecurityHeaders(response);
+      return addSecurityHeaders(response, env);
     } catch (error) {
       const requestId = crypto.randomUUID();
       console.error("Unhandled request error", requestId, error);
@@ -983,9 +983,10 @@ function methodNotAllowed(methods) {
   );
 }
 
-function addSecurityHeaders(response) {
+function addSecurityHeaders(response, env) {
   const headers = new Headers(response.headers);
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) headers.set(name, value);
+  if (env && env.PREVIEW_MODE === "true") headers.set("X-Robots-Tag", "noindex, nofollow");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
@@ -1053,7 +1054,10 @@ async function generateSitemap(env, origin) {
 ${propertyUrls}</urlset>`;
 }
 
-function generateRobots(origin) {
+function generateRobots(origin, env) {
+  if (env && env.PREVIEW_MODE === "true") {
+    return "User-agent: *\nDisallow: /\n";
+  }
   return `User-agent: *
 Allow: /
 
