@@ -1,0 +1,21 @@
+# EBV Imóveis Curitiba
+
+Site oficial da EBV Imóveis, conduzida por Edicleia Borba Vieira, corretora de imóveis e avaliadora imobiliária, CRECI PR 14269, com atuação em Curitiba e Região Metropolitana.
+
+## Páginas principais
+
+- Início: https://ebvimoveiscuritiba.com.br/
+- Imóveis disponíveis: https://ebvimoveiscuritiba.com.br/#imoveis
+- Simulador de financiamento: https://ebvimoveiscuritiba.com.br/simulador
+- Artigos: https://ebvimoveiscuritiba.com.br/artigos/
+
+## Guias
+
+- Parte jurídica da compra de um imóvel: https://ebvimoveiscuritiba.com.br/artigos/parte-juridica-compra-imovel/
+- Financiamento de imóvel usado passo a passo: https://ebvimoveiscuritiba.com.br/artigos/financiamento-imovel-passo-a-passo/
+- SAC ou Price: https://ebvimoveiscuritiba.com.br/artigos/sac-ou-price/
+
+## Transparência
+
+Os valores do simulador são estimativas. Aprovação, taxa final, seguros, indexadores e condições dependem da instituição financeira. Os artigos informam autoria, data de atualização e fontes oficiais.
+

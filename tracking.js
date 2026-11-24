@@ -10,8 +10,22 @@
   const CONTACT_KEY = "ebv_lead_contact";
   const CONSENT_KEY = "ebv_lgpd_consent";
   let pixelId = null;
+  let gtmId = null;
+  let ga4Id = null;
   let pixelLoaded = false;
+  let googleLoaded = false;
   const pendingTracks = [];
+
+  // Consent Mode v2: negado por padrão até o aceite explícito (LGPD opt-in).
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { window.dataLayer.push(arguments); }
+  gtag("consent", "default", {
+    ad_storage: "denied",
+    ad_user_data: "denied",
+    ad_personalization: "denied",
+    analytics_storage: "denied",
+    wait_for_update: 500,
+  });
 
   // ---------- storage seguro ----------
   function getLS(key) {
@@ -83,15 +97,62 @@
     return out;
   }
 
+  function trafficSource() {
+    const params = new URLSearchParams(window.location.search);
+    const campaignSource = String(params.get("utm_source") || "").toLowerCase();
+    if (campaignSource.includes("instagram")) return "instagram";
+    if (campaignSource.includes("facebook") || campaignSource.includes("meta")) return "facebook";
+    if (campaignSource.includes("google")) return "google";
+    if (!document.referrer) return "direct";
+    try {
+      const host = new URL(document.referrer).hostname.toLowerCase();
+      if (host.includes("instagram")) return "instagram";
+      if (host.includes("facebook") || host === "l.facebook.com") return "facebook";
+      if (host.includes("google")) return "google";
+      if (host === window.location.hostname) return "direct";
+    } catch { /* ignore */ }
+    return "other";
+  }
+
+  function siteMetric(eventName, data = {}) {
+    const payload = JSON.stringify({
+      eventName,
+      path: window.location.pathname,
+      source: trafficSource(),
+      propertyId: data.propertyId || null,
+    });
+    if (eventName !== "page_view") {
+      pushDataLayer(eventName, { path: window.location.pathname, source: trafficSource(), property_id: data.propertyId || undefined });
+    }
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon("/api/metrics/event", new Blob([payload], { type: "application/json" }));
+        return;
+      }
+    } catch { /* use fetch */ }
+    fetch("/api/metrics/event", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: payload,
+      keepalive: true,
+    }).catch(() => {});
+  }
+
+  function pushDataLayer(eventName, params = {}) {
+    if (!hasConsent()) return;
+    window.dataLayer.push({ event: eventName, ...params });
+    if (ga4Id) gtag("event", eventName, params);
+  }
+
   function newEventId(prefix) {
     const rand = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
     return `${prefix}:${rand}`;
   }
 
-  // ---------- Pixel ----------
-  // Sem escolha registrada = Pixel ligado (opt-out). Só "false" (recusou) desliga.
+  // ---------- Pixel e Consent Mode v2 (opt-in) ----------
   function hasConsent() {
-    return getLS(CONSENT_KEY) !== "false";
+    return getLS(CONSENT_KEY) === "true";
   }
 
   function expireCookie(name) {
@@ -101,8 +162,48 @@
     });
   }
 
-  // Chamado quando a pessoa recusa: revoga o Pixel já carregado e apaga os cookies dele.
+  function loadGoogleTags() {
+    if (googleLoaded || !hasConsent()) return;
+    if (!gtmId && !ga4Id) return;
+    googleLoaded = true;
+    if (gtmId) {
+      window.dataLayer.push({ "gtm.start": Date.now(), event: "gtm.js" });
+      const s = document.createElement("script");
+      s.async = true;
+      s.src = `https://www.googletagmanager.com/gtm.js?id=${encodeURIComponent(gtmId)}`;
+      document.head.appendChild(s);
+    } else if (ga4Id) {
+      const s = document.createElement("script");
+      s.async = true;
+      s.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(ga4Id)}`;
+      document.head.appendChild(s);
+      gtag("js", new Date());
+      gtag("config", ga4Id);
+    }
+  }
+
+  function grantConsent() {
+    setLS(CONSENT_KEY, "true");
+    gtag("consent", "update", {
+      ad_storage: "granted",
+      ad_user_data: "granted",
+      ad_personalization: "granted",
+      analytics_storage: "granted",
+    });
+    const saved = readJSON(STORE_KEY);
+    if (saved && saved.fbc && !readCookie("_fbc")) writeCookie("_fbc", saved.fbc, 90 * 24 * 60 * 60);
+    loadGoogleTags();
+    loadPixel();
+  }
+
+  // Chamado quando a pessoa recusa: revoga o Pixel/Consent Mode e apaga os cookies dele.
   function revokePixel() {
+    gtag("consent", "update", {
+      ad_storage: "denied",
+      ad_user_data: "denied",
+      ad_personalization: "denied",
+      analytics_storage: "denied",
+    });
     if (typeof window.fbq === "function") {
       try { window.fbq("consent", "revoke"); } catch { /* ignore */ }
     }
@@ -150,17 +251,20 @@
 
   async function init() {
     captureAttribution();
+    siteMetric("page_view");
     if (typeof window.__EBV_META_PIXEL_ID__ === "string" && window.__EBV_META_PIXEL_ID__) {
       pixelId = window.__EBV_META_PIXEL_ID__;
-      loadPixel();
+      if (hasConsent()) grantConsent();
       return;
     }
     try {
       const res = await fetch("/api/config", { credentials: "same-origin" });
       const cfg = res.ok ? await res.json() : {};
       pixelId = cfg.metaPixelId || null;
+      gtmId = cfg.gtmId || null;
+      ga4Id = cfg.ga4Id || null;
     } catch { pixelId = null; }
-    loadPixel();
+    if (hasConsent()) grantConsent();
   }
 
   // ---------- Eventos do site ----------
@@ -381,6 +485,7 @@
 
     wrap.style.display = "flex";
     track("WhatsAppFormOpen", { cta: ctx.cta, interest: ctx.interest || undefined });
+    siteMetric("form_open", { propertyId: ctx.property && ctx.property.id });
     const firstEmpty = !ctx.interest ? 'input[name="interest"]' : !saved.name ? "#wa-lead-name" : "#wa-lead-submit";
     setTimeout(() => { const el = wrap.querySelector(firstEmpty); if (el) el.focus(); }, 30);
   }
@@ -457,10 +562,11 @@
     } catch { /* segue para o WhatsApp mesmo se a API falhar */ }
 
     if (!duplicate) {
-      track("Lead", {
+      generateLead({
         lead_type: leadType,
         interest,
         cta: ctx.cta,
+        propertyId: prop ? prop.id : null,
         content_ids: prop ? [prop.id] : undefined,
         content_name: prop ? prop.title : undefined,
         currency: "BRL",
@@ -468,6 +574,7 @@
     }
 
     const url = `${ctx.waBase}?text=${encodeURIComponent(buildMessage(interest, prop, name))}`;
+    siteMetric("whatsapp_click", { propertyId: prop && prop.id });
     closeModal();
     if (win) {
       win.location.href = url;
@@ -513,20 +620,72 @@
     openModal(contextFor(link));
   }, true);
 
-  // Telefone e e-mail do rodapé: registra o contato no Pixel.
+  function generateLead(params = {}, eventId) {
+    const pixelParams = { ...params };
+    delete pixelParams.propertyId;
+    track("Lead", pixelParams, eventId);
+    siteMetric("generate_lead", { propertyId: params.propertyId || null });
+  }
+
+  // Telefone e e-mail do rodapé: registra phone_click / Contact.
   document.addEventListener("click", e => {
     const link = e.target.closest && e.target.closest('a[href^="tel:"], a[href^="mailto:"]');
     if (!link || link.closest("#admin-panel, [data-crm-link]")) return;
+    if (link.href.startsWith("tel:")) siteMetric("phone_click");
     track("Contact", { method: link.href.startsWith("tel:") ? "telefone" : "email", cta: link.dataset.cta || "rodape" });
   });
 
-  // Se a pessoa aceitar depois de ter recusado, liga o Pixel de novo.
+  // Cliques em CTAs principais e links externos.
   document.addEventListener("click", e => {
-    const btn = e.target.closest && e.target.closest('#lgpd-banner button');
-    if (btn) setTimeout(loadPixel, 0);
+    const cta = e.target.closest && e.target.closest("[data-cta], .btn-primary, .nav-cta, [data-open-contact]");
+    if (cta && !cta.closest("#admin-panel, #lgpd-banner")) {
+      siteMetric("cta_click");
+    }
+    const ext = e.target.closest && e.target.closest('a[href^="http"]');
+    if (ext && !ext.closest("#admin-panel, [data-crm-link]")) {
+      try {
+        const u = new URL(ext.href);
+        if (u.hostname !== window.location.hostname && !u.hostname.endsWith("wa.me")) {
+          siteMetric("outbound_click");
+        }
+      } catch { /* ignore */ }
+    }
   });
 
-  window.EBVTracking = { collect, newEventId, track, viewContent, loadPixel, revokePixel, getViewed };
+  // Primeiro campo preenchido de um formulário (uma vez por formulário).
+  const startedForms = new WeakSet();
+  document.addEventListener("input", e => {
+    const form = e.target && e.target.form;
+    if (!form || form.closest("#admin-panel") || startedForms.has(form)) return;
+    startedForms.add(form);
+    siteMetric("form_start");
+  });
+
+  // Leitura de 75% da página e leitura completa de artigo (uma vez por página).
+  let scroll75Sent = false;
+  let articleReadSent = false;
+  window.addEventListener("scroll", () => {
+    const doc = document.documentElement;
+    const max = doc.scrollHeight - window.innerHeight;
+    if (max <= 0) return;
+    const ratio = (window.scrollY + window.innerHeight) / doc.scrollHeight;
+    if (!scroll75Sent && ratio >= 0.75) {
+      scroll75Sent = true;
+      siteMetric("scroll_75");
+    }
+    if (!articleReadSent && window.location.pathname.startsWith("/artigos/") && window.location.pathname !== "/artigos/" && ratio >= 0.85) {
+      articleReadSent = true;
+      siteMetric("article_read");
+    }
+  }, { passive: true });
+
+  // Aceite no banner LGPD libera Consent Mode v2, Google tags e Pixel.
+  document.addEventListener("click", e => {
+    const acceptBtn = e.target.closest && e.target.closest('#lgpd-banner button[onclick*="acceptLgpdConsent"]');
+    if (acceptBtn) setTimeout(grantConsent, 0);
+  });
+
+  window.EBVTracking = { collect, newEventId, track, siteMetric, generateLead, grantConsent, viewContent, loadPixel, revokePixel, getViewed };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);
