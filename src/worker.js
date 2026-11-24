@@ -419,6 +419,9 @@ async function handleSimulatorPage(request, env, url) {
 }
 
 async function handleArticlePage(request, env, url) {
+  if (url.pathname === "/artigos/artigos.css") {
+    return env.ASSETS.fetch(request);
+  }
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Método não permitido.", { status: 405, headers: { Allow: "GET, HEAD" } });
   }
