@@ -361,9 +361,6 @@ async function submitContact(event, state) {
         content_name: state.property && state.property.title || "Simulação de financiamento",
       }, body.eventId);
     }
-    if (window.EBVTracking && window.EBVTracking.siteMetric) {
-      window.EBVTracking.siteMetric("simulator_contact", { propertyId: state.property && state.property.id });
-    }
   } catch (error) {
     showStatus(status, error.message || "Não foi possível enviar agora.", true);
   } finally {

@@ -5,6 +5,7 @@
 import { ensureSchema, upsertContactRow, canonicalPhone, safeJson } from "./schema.js";
 import { attachLeadToContact, afterLeadSaved, afterStageChange, originLabel } from "./crm.js";
 import { markFinancingSimulationConverted } from "./financing.js";
+import { recordSiteEvent } from "./site-metrics.js";
 
 const encoder = new TextEncoder();
 
@@ -27,6 +28,7 @@ export async function postLead(request, env, ctx, body) {
   const v = validateLeadInput(body);
   if (v.error) return { status: 400, body: { error: { code: "invalid_field", message: v.error } } };
 
+  const trackedOrigin = originLabel(v.value.tracking || {});
   const lead = await saveLead(request, env, ctx, {
     kind: v.value.context === "simulador" ? "simulador" : "whatsapp",
     leadType: v.value.leadType,
@@ -38,7 +40,9 @@ export async function postLead(request, env, ctx, body) {
     value: v.value.value,
     tracking: v.value.tracking,
     viewed: v.value.viewed,
-    origin: v.value.context === "simulador" ? "Simulador" : null,
+    origin: v.value.context === "simulador"
+      ? (trackedOrigin !== "Direto" ? `${trackedOrigin} · Simulador` : "Simulador")
+      : null,
     extra: { context: v.value.context, interest: v.value.interest, cta: v.value.cta, simulation: v.value.simulation },
   });
   if (v.value.simulation && v.value.simulation.id) {
@@ -307,6 +311,7 @@ async function saveLead(request, env, ctx, input) {
     phone: phoneDigits, email: input.email, property_id: input.propertyId, property_title: input.propertyTitle,
     value: input.value, data,
   };
+  ctx.waitUntil(recordServerLeadMetric(env, input));
   ctx.waitUntil(sendAndLog(env, lead, {
     eventName: "Lead",
     eventId,
@@ -590,6 +595,24 @@ function validateLeadInput(value) {
       viewed: Array.isArray(value.viewed) ? value.viewed.filter(x => typeof x === "string" && x.length <= 200).slice(0, 20) : [],
     },
   };
+}
+
+function recordServerLeadMetric(env, input) {
+  let path = "/";
+  try {
+    if (input.tracking && input.tracking.pageUrl) path = new URL(input.tracking.pageUrl).pathname || "/";
+  } catch { /* ignore */ }
+  const utm = String((input.tracking && input.tracking.utm_source) || "").toLowerCase();
+  const ref = String((input.tracking && input.tracking.referrer) || "").toLowerCase();
+  const source = utm.includes("instagram") || ref.includes("instagram") ? "instagram"
+    : utm.includes("facebook") || utm.includes("meta") || ref.includes("facebook") ? "facebook"
+    : utm.includes("google") || ref.includes("google") ? "google"
+    : ref ? "other" : "direct";
+  const tasks = [recordSiteEvent(env, { eventName: "generate_lead", path, source, propertyId: input.propertyId || null })];
+  if (input.kind === "simulador") {
+    tasks.push(recordSiteEvent(env, { eventName: "simulator_contact", path, source, propertyId: input.propertyId || null }));
+  }
+  return Promise.all(tasks).catch(() => {});
 }
 
 function sanitizeSimulation(value) {

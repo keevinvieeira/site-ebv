@@ -623,7 +623,7 @@
     const pixelParams = { ...params };
     delete pixelParams.propertyId;
     track("Lead", pixelParams, eventId);
-    siteMetric("generate_lead", { propertyId: params.propertyId || null });
+    pushDataLayer("generate_lead", { path: window.location.pathname, source: trafficSource(), property_id: params.propertyId || undefined });
   }
 
   // Telefone e e-mail do rodapé: registra phone_click / Contact.
